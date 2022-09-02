@@ -67,7 +67,7 @@ for path in listpa[12000:18000]:
     meta = scio.loadmat(os.path.join(root, scene, img_id+'-meta.mat'))
     with Image.open(os.path.join(root, scene, img_id+'-label.png')) as li:
         labels = np.array(li)
-    '''rgb_labels = labels.copy()'''
+    
     K = config.intrinsic_matrix['ycb_K2']
 
     h, w = labels.shape
