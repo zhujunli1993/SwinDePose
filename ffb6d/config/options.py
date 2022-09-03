@@ -17,6 +17,7 @@ class BaseOptions():
         g_data.add_argument('--width', type=int, default=640, help='YCBV image width')
         g_data.add_argument('--height', type=int, default=480, help='YCBV image height')
         g_data.add_argument('--data_root', type=str, help='Dataset Location.')
+        g_data.add_argument('--rm_outline', action='store_true', help='Remove points with too small depth value from depth image.')
         # Experiment related
         g_exp = parser.add_argument_group('Experiment')
         g_exp.add_argument('--exp_dir', type=str, default='/workspace/REPO/pose_estimation', help='code directory')
