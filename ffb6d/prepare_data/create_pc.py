@@ -87,7 +87,7 @@ if opt.syn:
                 np.savetxt(f, matrix1, fmt='%i', delimiter=' ')
                 np.savetxt(f, matrix2, fmt='%i', delimiter=' ')
                 np.savetxt(f, dpt_xyz, fmt = '%.4f', delimiter=' ')
-            path_root = "/workspace/ClassificationProject-master/Applications/ComputeSignedAnglesFromPtxFile/"
+            path_root = opt.angles_gen
             code = path_root + "compute_signed_angles_from_ptx_file"   
             os.system(code+" "+partial_path)
             if not os.path.isfile(os.path.join(root_syn, img_id+'-pseudo_angles.png')) :
@@ -134,7 +134,7 @@ if opt.real:
                     dpt_xyz = np.reshape(dpt_xyz,(h*w, 3))
                     cld = dpt_xyz.reshape(-1, 3)[choose, :]
                     
-                    new_col = 0.5000*np.ones([h*w,1])
+                    new_col = 0.5000*np.ones([len(choose),1])
                     dpt_xyz = np.append(cld, new_col, 1)
                     dpt_xyz = torch.from_numpy(dpt_xyz)
                     
@@ -168,7 +168,7 @@ if opt.real:
                     np.savetxt(f, matrix1, fmt='%i', delimiter=' ')
                     np.savetxt(f, matrix2, fmt='%i', delimiter=' ')
                     np.savetxt(f, dpt_xyz, fmt = '%.4f', delimiter=' ')
-                path_root = "/workspace/ClassificationProject-master/Applications/ComputeSignedAnglesFromPtxFile/"
+                path_root = opt.angles_gen
                 code = path_root + "compute_signed_angles_from_ptx_file"   
                 os.system(code+" "+partial_path)
 

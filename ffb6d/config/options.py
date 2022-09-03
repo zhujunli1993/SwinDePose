@@ -18,6 +18,8 @@ class BaseOptions():
         g_data.add_argument('--height', type=int, default=480, help='YCBV image height')
         g_data.add_argument('--data_root', type=str, help='Dataset Location.')
         g_data.add_argument('--rm_outline', action='store_true', help='Remove points with too small depth value from depth image.')
+        g_data.add_argument('--angles_gen', type=str,  help='The C++ codes directory for generating XYZ angles and signed angles file.')
+        
         # Experiment related
         g_exp = parser.add_argument_group('Experiment')
         g_exp.add_argument('--exp_dir', type=str, default='/workspace/REPO/pose_estimation', help='code directory')
