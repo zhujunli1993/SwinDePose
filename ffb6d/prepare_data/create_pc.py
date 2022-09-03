@@ -1,33 +1,25 @@
 #!/usr/bin/env python3
 import os
-import glob
-import cv2
+import sys
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import torch
-import os.path
+import glob
 import numpy as np
-import torchvision.transforms as transforms
 from PIL import Image
-import sys 
 from tqdm import tqdm
-sys.path.append('../..')
 from config.common import Config
-import pickle as pkl
-from utils.basic_utils import Basic_Utils
+from config.options import BaseOptions
 import scipy.io as scio
-import scipy.misc
-try:
-    from neupeak.utils.webcv2 import imshow, waitKey
-except:
-    from cv2 import imshow, waitKey
 import time
 from process import render_mulimage_angles,render_mulimage_signed
 
-config = Config(ds_name='ycb')
-bs_utils = Basic_Utils(config)
-cls_lst = bs_utils.read_lines(config.ycb_cls_lst_p)
 
-xmap = np.array([[j for i in range(640)] for j in range(480)])
-ymap = np.array([[i for i in range(640)] for j in range(480)])
+
+opt = BaseOptions().parse()
+config = Config(ds_name=opt.dataset_name)
+xmap = np.array([[j for i in range(opt.width)] for j in range(opt.height)])
+ymap = np.array([[i for i in range(opt.width)] for j in range(opt.height)])
 
 
 
@@ -44,86 +36,81 @@ def dpt_2_pcld(dpt, cam_scale, K):
     dpt_3d = dpt_3d * msk[:, :, None]
     return dpt_3d
 
-root = 'YCB_Video_Dataset/data'
-#root_syn = 'YCB_Video_Dataset/data_syn'
-scenes_data = os.listdir(root)
-#scenes_syn = os.listdir(root_syn)
-file_pa = 'no_pseudo_angles.txt'
-listpa = np.loadtxt(file_pa,dtype=str)
 
-#for scene in scenes_data: 0~6000, 6000~12000, 12000~18000
-for path in listpa[12000:18000]:
-    img_id = path.split('/')[1]
-    scene = path.split('/')[0]
-    
-    #for img_id in os.listdir(os.path.join(root, scene)):
-        #if img_id.endswith('box.txt'):
-            #img_id = img_id.split('.')[0].split('-')[0]
-    
-    if os.path.isfile(os.path.join(root, scene, img_id+'-pseudo_angles.png')) and os.path.isfile(os.path.join(root, scene, img_id+'-pseudo_signed.png')):
-        continue
-    with Image.open(os.path.join(root, scene, img_id+'-depth.png')) as di:
-        dpt_um = np.array(di)
-    meta = scio.loadmat(os.path.join(root, scene, img_id+'-meta.mat'))
-    with Image.open(os.path.join(root, scene, img_id+'-label.png')) as li:
-        labels = np.array(li)
-    
-    K = config.intrinsic_matrix['ycb_K2']
+if opt.syn:
+    root_syn = os.path.join(opt.data_root, 'data_syn')
+    img_data = os.listdir(root_syn)
+    for img in img_data:
+        if img.endswith(".mat"):
+            import pdb; pdb.set_trace()
+            img_id = img.split('.')[0].split('-')[0]
+            # if os.path.isfile(os.path.join(root, scene, img_id+'-pseudo_angles.png')) and os.path.isfile(os.path.join(root, scene, img_id+'-pseudo_signed.png')):
+            #     continue
+            with Image.open(os.path.join(root, scene, img_id+'-depth.png')) as di:
+                dpt_um = np.array(di)
+            meta = scio.loadmat(os.path.join(root, scene, img_id+'-meta.mat'))
+            with Image.open(os.path.join(root, scene, img_id+'-label.png')) as li:
+                labels = np.array(li)
+            
+            K = config.intrinsic_matrix['ycb_K2']
 
-    h, w = labels.shape
-    cam_scale = meta['factor_depth'].astype(np.float32)[0][0]
-    msk_dp = dpt_um > 1e-6
+            h, w = labels.shape
+            cam_scale = meta['factor_depth'].astype(np.float32)[0][0]
+            msk_dp = dpt_um > 1e-6
 
-    dpt_um = bs_utils.fill_missing(dpt_um, cam_scale, 1)
-    msk_dp = dpt_um > 1e-6
+            dpt_um = bs_utils.fill_missing(dpt_um, cam_scale, 1)
+            msk_dp = dpt_um > 1e-6
 
-    dpt_mm = (dpt_um.copy()/10).astype(np.uint16)
+            dpt_mm = (dpt_um.copy()/10).astype(np.uint16)
 
-    dpt_m = dpt_um.astype(np.float32) / cam_scale
+            dpt_m = dpt_um.astype(np.float32) / cam_scale
 
-    dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
+            dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
 
-    xyz_lst = [dpt_xyz.transpose(2, 0, 1)] # c, h, w
-    msk_lst = [dpt_xyz[2, :, :] > 1e-8]
+            xyz_lst = [dpt_xyz.transpose(2, 0, 1)] # c, h, w
+            msk_lst = [dpt_xyz[2, :, :] > 1e-8]
 
-    dpt_xyz = np.reshape(dpt_xyz,(480*640, 3))
+            dpt_xyz = np.reshape(dpt_xyz,(480*640, 3))
 
-    new_col = 0.5000*np.ones([480*640,1])
-    dpt_xyz = np.append(dpt_xyz, new_col, 1)
+            new_col = 0.5000*np.ones([480*640,1])
+            dpt_xyz = np.append(dpt_xyz, new_col, 1)
 
-    dpt_xyz = torch.from_numpy(dpt_xyz)
+            dpt_xyz = torch.from_numpy(dpt_xyz)
 
-    #pcd format preparation
-    xCenter = (torch.max(dpt_xyz[:,0]) + torch.min(dpt_xyz[:,0])) / 2.0000
-    yCenter = (torch.max(dpt_xyz[:,1]) + torch.min(dpt_xyz[:,1])) / 2.0000
-    zCenter = (torch.max(dpt_xyz[:,2]) + torch.min(dpt_xyz[:,2])) / 2.0000
-    image_center = np.asarray([xCenter, yCenter, zCenter])
-    image_center = np.reshape(image_center, (1,3))
+            #pcd format preparation
+            xCenter = (torch.max(dpt_xyz[:,0]) + torch.min(dpt_xyz[:,0])) / 2.0000
+            yCenter = (torch.max(dpt_xyz[:,1]) + torch.min(dpt_xyz[:,1])) / 2.0000
+            zCenter = (torch.max(dpt_xyz[:,2]) + torch.min(dpt_xyz[:,2])) / 2.0000
+            image_center = np.asarray([xCenter, yCenter, zCenter])
+            image_center = np.reshape(image_center, (1,3))
 
-    partial_path = os.path.join(root, scene, img_id+'.ptx') 
+            partial_path = os.path.join(root, scene, img_id+'.ptx') 
 
-    row_col = np.asarray([h,w])
-    row_col = np.reshape(row_col, (2,1))
-    matrix1 = np.eye(3, dtype=int)
-    matrix2 = np.eye(4, dtype=int)
-    with open(partial_path, 'wb') as f:
-        np.savetxt(f, row_col , fmt='%i', delimiter=' ')
-        np.savetxt(f, image_center, fmt='%.4f', delimiter=' ')
-        np.savetxt(f, matrix1, fmt='%i', delimiter=' ')
-        np.savetxt(f, matrix2, fmt='%i', delimiter=' ')
-        np.savetxt(f, dpt_xyz, fmt = '%.4f', delimiter=' ')
-    path_root = "/workspace/ClassificationProject-master/Applications/ComputeSignedAnglesFromPtxFile/"
-    code = path_root + "compute_signed_angles_from_ptx_file"   
-    os.system(code+" "+partial_path)
-    if not os.path.isfile(os.path.join(root, scene, img_id+'-pseudo_angles.png')) :
-        render_mulimage_angles(os.path.join(root, scene), img_id)
-    if not os.path.isfile(os.path.join(root, scene, img_id+'-pseudo_signed.png')):
-        render_mulimage_signed(os.path.join(root, scene), img_id)
-    
-    if os.path.isfile(partial_path):
-        os.system("rm " + partial_path)
-    
-print('Done Synthetic Dataset!!')
+            row_col = np.asarray([h,w])
+            row_col = np.reshape(row_col, (2,1))
+            matrix1 = np.eye(3, dtype=int)
+            matrix2 = np.eye(4, dtype=int)
+            with open(partial_path, 'wb') as f:
+                np.savetxt(f, row_col , fmt='%i', delimiter=' ')
+                np.savetxt(f, image_center, fmt='%.4f', delimiter=' ')
+                np.savetxt(f, matrix1, fmt='%i', delimiter=' ')
+                np.savetxt(f, matrix2, fmt='%i', delimiter=' ')
+                np.savetxt(f, dpt_xyz, fmt = '%.4f', delimiter=' ')
+            path_root = "/workspace/ClassificationProject-master/Applications/ComputeSignedAnglesFromPtxFile/"
+            code = path_root + "compute_signed_angles_from_ptx_file"   
+            os.system(code+" "+partial_path)
+            if not os.path.isfile(os.path.join(root, scene, img_id+'-pseudo_angles.png')) :
+                render_mulimage_angles(os.path.join(root, scene), img_id)
+            if not os.path.isfile(os.path.join(root, scene, img_id+'-pseudo_signed.png')):
+                render_mulimage_signed(os.path.join(root, scene), img_id)
+            
+            if os.path.isfile(partial_path):
+                os.system("rm " + partial_path)
+                
+    print('Done Synthetic Dataset!!')
+if opt.real:
+    root_real = os.path.join(opt.root, 'data')
+    scenes_data = os.listdir(root_real)
 
 '''wordList = []
 i=0 

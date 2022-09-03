@@ -32,70 +32,20 @@ class Config:
         self.dataset_name = opt.dataset_name
         self.exp_dir = opt.exp_dir
         self.n_keypoints = opt.n_keypoints
-        # self.exp_name = os.path.basename(self.exp_dir)
-        # self.resnet_ptr_mdl_p = os.path.abspath(
-        #     os.path.join(
-        #         self.exp_dir,
-        #         'models/cnn/ResNet_pretrained_mdl'
-        #     )
-        # )
-        # ensure_fd(self.resnet_ptr_mdl_p)
-
-        # log folder
-        # self.cls_type = cls_type
-        # self.log_dir = os.path.abspath(
-        #     os.path.join(self.exp_dir, 'train_log', 'ycb_new')
-        # )
-
-        # ensure_fd(self.log_dir)
-        # self.log_model_dir = os.path.join(self.log_dir, 'checkpoints', self.cls_type)
-        # ensure_fd(self.log_model_dir)
-        # self.log_eval_dir = os.path.join(self.log_dir, 'eval_results', self.cls_type)
-        # ensure_fd(self.log_eval_dir)
-        # self.log_traininfo_dir = os.path.join(self.log_dir, 'train_info', self.cls_type)
-        # ensure_fd(self.log_traininfo_dir)
-
-        # self.n_total_epoch = 25
-        # self.mini_batch_size = 3
-        # self.val_mini_batch_size = 3
-        # self.test_mini_batch_size = 1
-
-        # self.n_sample_points = 480 * 640 // 24  # Number of input points
-        # self.n_keypoints = 8
-        # self.n_min_points = 400
-
-        # self.noise_trans = 0.05  # range of the random noise of translation added to the training data
-
         self.preprocessed_testset_pth = ''
         if self.dataset_name == 'ycb':
+            self.ycb_root = opt.data_root
             self.n_objects = 21 + 1  # 21 objects + background
             self.n_classes = self.n_objects
             self.use_orbfps = True
-            self.train_path='datasets/ycb/dataset_config/train_less_shu.txt'
-            self.test_path='datasets/ycb/dataset_config/test_less_shu.txt'
-            self.kp_orbfps_dir = 'datasets/ycb/ycb_kps/'
+            self.train_path=os.path.join(self.ycb_root, 'dataset_config', 'train_less_shu.txt')
+            self.test_path=os.path.join(self.ycb_root, 'dataset_config', 'test_less_shu.txt')
+            self.kp_orbfps_dir = os.path.join(self.ycb_root, 'ycb_kps')
             self.kp_orbfps_ptn = os.path.join(self.kp_orbfps_dir, '%s_%d_kps.txt')
-            self.ycb_cls_lst_p = os.path.abspath(
-                os.path.join(
-                    self.exp_dir, 'datasets/ycb/dataset_config/classes.txt'
-                )
-            )
-            self.ycb_root = os.path.abspath(
-                os.path.join(
-                    self.exp_dir, 'datasets/ycb/YCB_Video_Dataset'
-                )
-            )
-            self.ycb_kps_dir = os.path.abspath(
-                os.path.join(
-                    self.exp_dir, 'datasets/ycb/ycb_kps/'
-                )
-            )
+            self.ycb_cls_lst_p = os.path.join(self.ycb_root, 'dataset_config', 'classes.txt')
+            self.ycb_kps_dir = os.path.join(self.ycb_root, 'ycb_kps')
             
-            ycb_r_lst_p = os.path.abspath(
-                os.path.join(
-                    self.exp_dir, 'datasets/ycb/dataset_config/radius.txt'
-                )
-            )
+            ycb_r_lst_p = os.path.join(self.ycb_root, 'dataset_config', 'radius.txt')
             self.ycb_r_lst = list(np.loadtxt(ycb_r_lst_p))
             self.ycb_cls_lst = self.read_lines(self.ycb_cls_lst_p)
             self.ycb_sym_cls_ids = [13, 16, 19, 20, 21]

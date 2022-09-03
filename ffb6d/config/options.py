@@ -12,11 +12,14 @@ class BaseOptions():
         # Datasets related
         g_data = parser.add_argument_group('Data')
         g_data.add_argument('--dataset_name', type=str, default='ycb', help='dataset name: ycb | linemod')
-
-        
+        g_data.add_argument('--syn', action='store_true', help='Generate YCBV synthetic pseudo images')
+        g_data.add_argument('--real', action='store_true', help='Generate YCBV real pseudo images')
+        g_data.add_argument('--width', type=int, default=640, help='YCBV image width')
+        g_data.add_argument('--height', type=int, default=480, help='YCBV image height')
+        g_data.add_argument('--data_root', type=str, help='Dataset Location.')
         # Experiment related
         g_exp = parser.add_argument_group('Experiment')
-        g_exp.add_argument('--exp_dir', type=str, default='/workspace/pose-estimation-dls1/ffb6d', help='code directory')
+        g_exp.add_argument('--exp_dir', type=str, default='/workspace/REPO/pose_estimation', help='code directory')
         g_exp.add_argument('--wandb_proj', type=str, help='wandb project name')
         g_exp.add_argument('--wandb_name', type=str, help='wandb run name')
         g_exp.add_argument('--gpu_id', type=int, default=0, help='gpu id for cuda')
@@ -34,10 +37,10 @@ class BaseOptions():
         
         # Training related
         g_train = parser.add_argument_group('Training')
-        g_train.add_argument('--log_eval_dir', type=str, default='/workspace/pose-estimation-dls1/ffb6d/train_log/ycb_new/eval_results', help='path to save evaluation results' )
-        g_train.add_argument('--save_checkpoint', type=str, default='/workspace/pose-estimation-dls1/ffb6d/train_log/ycb_new/checkpoints', help='path to save checkpoints')
+        g_train.add_argument('--log_eval_dir', type=str, default='/workspace/REPO/pose_estimation/ffb6d/train_log/ycb_new/eval_results', help='path to save evaluation results' )
+        g_train.add_argument('--save_checkpoint', type=str, default='/workspace/REPO/pose_estimation/ffb6d/train_log/ycb_new/checkpoints', help='path to save checkpoints')
         g_train.add_argument('--load_checkpoint', type=str, help='path to save checkpoints')
-        g_train.add_argument('--log_traininfo_dir', type=str, default='/workspace/pose-estimation-dls1/ffb6d/train_log/ycb_new/train_info', help='path to save training losses results')
+        g_train.add_argument('--log_traininfo_dir', type=str, default='/workspace/REPO/pose_estimationffb6d/train_log/ycb_new/train_info', help='path to save training losses results')
         g_train.add_argument('--n_total_epoch', type=int, default=25, help='epoch numbers')
         g_train.add_argument('--mini_batch_size', type=int, default=8, help='training batch size')
         g_train.add_argument('--val_mini_batch_size', type=int, default=8, help='validation batch size')
