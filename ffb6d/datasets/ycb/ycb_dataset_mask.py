@@ -252,7 +252,7 @@ class Dataset():
         if self.add_noise and rnd_typ == 'syn':
             rgb = self.rgb_add_noise(rgb)
             rgb_s = self.rgb_add_noise(rgb_s)
-            rgb, rgb_s, dpt_um = self.add_real_back(rgb, rgb_s, dpt_um, msk_dp)
+            rgb, rgb_s, dpt_um = self.add_real_back(rgb, rgb_s, rgb_labels, dpt_um, msk_dp)
             if self.rng.rand() > 0.8:
                 rgb = self.rgb_add_noise(rgb)
                 rgb_s = self.rgb_add_noise(rgb_s)
@@ -367,7 +367,7 @@ class Dataset():
             ).astype(np.int32).squeeze(0)
             inputs['p2r_up_nei_idx%d'%i] = p2r_nei.copy()
 
-        show_rgb = rgb.transpose(1, 2, 0).copy()[:, :, ::-1]
+        # show_rgb = rgb.transpose(1, 2, 0).copy()[:, :, ::-1]
 
         item_dict = dict(
             rgb=rgb_c.astype(np.uint8),  # [c, h, w]

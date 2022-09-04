@@ -27,15 +27,16 @@ from torch.optim.lr_scheduler import CyclicLR
 import torch.backends.cudnn as cudnn
 
 import wandb
-# from tensorboardX import SummaryWriter
 
+from config.options import BaseOptions
 from config.common import Config, ConfigRandLA
-import datasets.ycb.ycb_dataset_new as dataset_desc
+
+import datasets.ycb.ycb_dataset_full as dataset_desc
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
 from config.options import BaseOptions
 import models.pytorch_utils as pt_utils
-from models.ffb6d_new import FFB6D
+from models.ffb6d_full import FFB6D
 from models.loss import OFLoss, FocalLoss
 
 from apex.parallel import DistributedDataParallel
@@ -48,7 +49,15 @@ opt = BaseOptions().parse()
 
 config = Config(opt.dataset_name)
 bs_utils = Basic_Utils(config)
-# writer = SummaryWriter(log_dir=opt.log_traininfo_dir)
+
+# create log folders 
+if not os.path.exists(opt.log_eval_dir):
+    os.makedirs(opt.log_eval_dir)
+if not os.path.exists(opt.save_checkpoint):
+    os.makedirs(opt.save_checkpoint)
+if not os.path.exists(opt.log_traininfo_dir):
+    os.makedirs(opt.log_traininfo_dir)
+
 
 rlimit = resource.getrlimit(resource.RLIMIT_NOFILE)
 resource.setrlimit(resource.RLIMIT_NOFILE, (30000, rlimit[1]))
@@ -59,63 +68,6 @@ for i in range(config.n_objects):
     color = (col_mul//(255*255), (col_mul//255) % 255, col_mul % 255)
     color_lst.append(color)
 
-
-# parser = argparse.ArgumentParser(description="Arg parser")
-# parser.add_argument(
-#     "-weight_decay", type=float, default=0,
-#     help="L2 regularization coeff [default: 0.0]",
-# )
-# parser.add_argument(
-#     "-lr", type=float, default=1e-2,
-#     help="Initial learning rate [default: 1e-2]"
-# )
-# parser.add_argument(
-#     "-lr_decay", type=float, default=0.5,
-#     help="Learning rate decay gamma [default: 0.5]",
-# )
-# parser.add_argument(
-#     "-decay_step", type=float, default=2e5,
-#     help="Learning rate decay step [default: 20]",
-# )
-# parser.add_argument(
-#     "-bn_momentum", type=float, default=0.9,
-#     help="Initial batch norm momentum [default: 0.9]",
-# )
-# parser.add_argument(
-#     "-bn_decay", type=float, default=0.5,
-#     help="Batch norm momentum decay gamma [default: 0.5]",
-# )
-# parser.add_argument(
-#     "-checkpoint", type=str, default=None,
-#     help="Checkpoint to start from"
-# )
-# parser.add_argument(
-#     "-epochs", type=int, default=500, help="Number of epochs to train for"
-# )
-# parser.add_argument(
-#     "-eval_net", action='store_true', help="whether is to eval net."
-# )
-# parser.add_argument("-test", action="store_true")
-# parser.add_argument("-test_pose", action="store_true")
-# parser.add_argument("-test_gt", action="store_true")
-# parser.add_argument("-cal_metrics", action="store_true")
-# parser.add_argument("-view_dpt", action="store_true")
-# parser.add_argument('-debug', action='store_true')
-
-# parser.add_argument('--local_rank', type=int, default=0)
-# parser.add_argument('--gpu_id', type=list, default=[0])
-# parser.add_argument('-n', '--nodes', default=1, type=int, metavar='N')
-# parser.add_argument('-g', '--gpus', default=8, type=int,
-#                     help='number of gpus per node')
-# parser.add_argument('-nr', '--nr', default=1, type=int,
-#                     help='ranking within the nodes')
-# parser.add_argument('--gpu', type=str, default="0")
-# parser.add_argument('--deterministic', action='store_true')
-# parser.add_argument('--keep_batchnorm_fp32', default=True)
-# parser.add_argument('--opt_level', default="O0", type=str,
-#                     help='opt level of apex mix presision trainig.')
-
-# opt = parser.parse_opt()
 
 os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpu
 
@@ -152,7 +104,6 @@ def checkpoint_state(model=None, optimizer=None, best_prec=None, epoch=None, it=
         "optimizer_state": optim_state,
         "amp": amp.state_dict(),
     }
-
 
 def save_checkpoint(
         state, is_best, filename="checkpoint", bestname="model_best",
@@ -312,7 +263,7 @@ def model_fn_decorator(
 
 
 class Trainer(object):
-    r"""
+    """
         Reasonably generic trainer for pytorch models
 
     Parameters
@@ -554,27 +505,27 @@ def train():
         backend='nccl',
         init_method='env://',
     )
-    torch.manual_seed(0)
+    
 
     if not opt.eval_net:
         train_ds = dataset_desc.Dataset('train')
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_ds)
         train_loader = torch.utils.data.DataLoader(
             train_ds, batch_size=opt.mini_batch_size, shuffle=False,
-            drop_last=True, num_workers=4, sampler=train_sampler, pin_memory=True
+            drop_last=True, num_workers=opt.num_threads, sampler=train_sampler, pin_memory=opt.pin_memory
         )
 
         val_ds = dataset_desc.Dataset('test')
         val_sampler = torch.utils.data.distributed.DistributedSampler(val_ds)
         val_loader = torch.utils.data.DataLoader(
             val_ds, batch_size=opt.val_mini_batch_size, shuffle=False,
-            drop_last=False, num_workers=4, sampler=val_sampler
+            drop_last=False, num_workers=opt.num_threads, sampler=val_sampler
         )
     else:
         test_ds = dataset_desc.Dataset('test')
         test_loader = torch.utils.data.DataLoader(
             test_ds, batch_size=opt.test_mini_batch_size, shuffle=False,
-            num_workers=20
+            num_workers=opt.num_threads
         )
 
     rndla_cfg = ConfigRandLA
@@ -600,9 +551,9 @@ def train():
     start_epoch = 1
 
     # load status from checkpoint
-    if opt.checkpoint is not None:
+    if opt.load_checkpoint is not None:
         checkpoint_status = load_checkpoint(
-            model, optimizer, filename=opt.checkpoint[:-8]
+            model, optimizer, filename=opt.load_checkpoint
         )
         if checkpoint_status is not None:
             it, start_epoch, best_loss = checkpoint_status
@@ -646,7 +597,7 @@ def train():
             opt.test,
         )
 
-    checkpoint_fd = opt.checkpoint 
+    checkpoint_fd = opt.save_checkpoint 
 
     trainer = Trainer(
         model,
@@ -675,7 +626,6 @@ def train():
 
         if start_epoch == opt.n_total_epoch:
             _ = trainer.eval_epoch(val_loader)
-
 
 if __name__ == "__main__":
     opt.world_size = opt.gpus * opt.nodes

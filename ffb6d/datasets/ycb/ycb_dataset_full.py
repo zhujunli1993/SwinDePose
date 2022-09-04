@@ -4,6 +4,7 @@ import cv2
 import torch
 import os.path
 import numpy as np
+import numpy.ma as ma
 import torchvision.transforms as transforms
 from PIL import Image
 from config.common import Config
@@ -28,9 +29,11 @@ class Dataset():
 
     def __init__(self, dataset_name, DEBUG=False):
         self.dataset_name = dataset_name
+        self.img_width = 480
+        self.img_length = 640
         self.debug = DEBUG
-        self.xmap = np.array([[j for i in range(640)] for j in range(480)])
-        self.ymap = np.array([[i for i in range(640)] for j in range(480)])
+        self.xmap = np.array([[j for i in range(self.img_length)] for j in range(self.img_width)])
+        self.ymap = np.array([[i for i in range(self.img_length)] for j in range(self.img_width)])
         self.diameters = {}
         self.trancolor = transforms.ColorJitter(0.2, 0.2, 0.2, 0.05)
         self.norm = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.224])
@@ -70,7 +73,7 @@ class Dataset():
             idx = self.rng.randint(0, n)
             item = self.syn_lst[idx]
         return item
-
+    
     def real_gen(self):
         n = len(self.real_lst)
         idx = self.rng.randint(0, n)
@@ -143,7 +146,8 @@ class Dataset():
 
         return np.clip(img, 0, 255).astype(np.uint8)
 
-    def add_real_back(self, rgb, labels, dpt, dpt_msk):
+
+    def add_real_back(self, rgb, rgb_s, labels, dpt, dpt_msk):
         real_item = self.real_gen()
         with Image.open(os.path.join(self.root, real_item+'-depth.png')) as di:
             real_dpt = np.array(di)
@@ -151,19 +155,22 @@ class Dataset():
             bk_label = np.array(li)
         bk_label = (bk_label <= 0).astype(rgb.dtype)
         bk_label_3c = np.repeat(bk_label[:, :, None], 3, 2)
-        with Image.open(os.path.join(self.root, real_item+'-pseudo.png')) as ri:
+        with Image.open(os.path.join(self.root, real_item+'-pseudo_angles.png')) as ri:
             back = np.array(ri)[:, :, :3] * bk_label_3c
+        with Image.open(os.path.join(self.root, real_item+'-pseudo_signed.png')) as rs:
+            back_s = np.array(rs)[:, :, :3] * bk_label_3c
         dpt_back = real_dpt.astype(np.float32) * bk_label.astype(np.float32)
 
         msk_back = (labels <= 0).astype(rgb.dtype)
         msk_back = np.repeat(msk_back[:, :, None], 3, 2)
         rgb = rgb * (msk_back == 0).astype(rgb.dtype) + back * msk_back
-
+        rgb_s = rgb_s * (msk_back == 0).astype(rgb_s.dtype) + back_s * msk_back
         dpt = dpt * (dpt_msk > 0).astype(dpt.dtype) + \
             dpt_back * (dpt_msk <= 0).astype(dpt.dtype)
-        return rgb, dpt
 
-    def dpt_2_pcld(self, dpt, cam_scale, K):
+        return rgb, rgb_s, dpt
+
+    def dpt_2_pcld(self, dpt,cam_scale, K):
         if len(dpt.shape) > 2:
             dpt = dpt[:, :, 0]
         dpt = dpt.astype(np.float32) / cam_scale
@@ -177,6 +184,7 @@ class Dataset():
         return dpt_3d
 
     def get_item(self, item_name):
+        
         with Image.open(os.path.join(self.root, item_name+'-depth.png')) as di:
             dpt_um = np.array(di)
         with Image.open(os.path.join(self.root, item_name+'-label.png')) as li:
@@ -188,20 +196,28 @@ class Dataset():
         else:
             K = config.intrinsic_matrix['ycb_K1']
 
-        with Image.open(os.path.join(self.root, item_name+'-pseudo.png')) as ri:
+        with Image.open(os.path.join(self.root, item_name+'-pseudo_angles.png')) as ri:
             if self.add_noise:
                 ri = self.trancolor(ri)
             rgb = np.array(ri)[:, :, :3]
+        
+        with Image.open(os.path.join(self.root, item_name+'-pseudo_signed.png')) as rs:
+            if self.add_noise:
+                rs = self.trancolor(rs)
+            rgb_s = np.array(rs)[:, :, :3]
+            
         rnd_typ = 'syn' if 'syn' in item_name else 'real'
         cam_scale = meta['factor_depth'].astype(np.float32)[0][0]
         msk_dp = dpt_um > 1e-6
 
         if self.add_noise and rnd_typ == 'syn':
             rgb = self.rgb_add_noise(rgb)
-            rgb, dpt_um = self.add_real_back(rgb, rgb_labels, dpt_um, msk_dp)
+            rgb_s = self.rgb_add_noise(rgb_s)
+            rgb, rgb_s, dpt_um = self.add_real_back(rgb, rgb_s, rgb_labels, dpt_um, msk_dp)
             if self.rng.rand() > 0.8:
                 rgb = self.rgb_add_noise(rgb)
-
+                rgb_s = self.rgb_add_noise(rgb_s)
+        rgb_c = np.concatenate((rgb, rgb_s), axis=2)  #[h,w,6]
         dpt_um = bs_utils.fill_missing(dpt_um, cam_scale, 1)
         msk_dp = dpt_um > 1e-6
 
@@ -236,20 +252,22 @@ class Dataset():
         choose = choose[sf_idx]
 
         cld = dpt_xyz.reshape(-1, 3)[choose, :]
-        rgb_pt = rgb.reshape(-1, 3)[choose, :].astype(np.float32)
+        rgb_c_pt = rgb_c.reshape(-1, 6)[choose, :].astype(np.float32)
+        
         nrm_pt = nrm_map[:, :, :3].reshape(-1, 3)[choose, :]
         labels_pt = labels.flatten()[choose]
         choose = np.array([choose])
-        cld_rgb_nrm = np.concatenate((cld, rgb_pt, nrm_pt), axis=1).transpose(1, 0)
+        cld_rgb_nrm = np.concatenate((cld, rgb_c_pt, nrm_pt), axis=1).transpose(1, 0)
 
         cls_id_lst = meta['cls_indexes'].flatten().astype(np.uint32)
+        
         RTs, kp3ds, ctr3ds, cls_ids, kp_targ_ofst, ctr_targ_ofst = self.get_pose_gt_info(
             cld, labels_pt, cls_id_lst, meta
         )
 
         h, w = rgb_labels.shape
         dpt_6c = np.concatenate((dpt_xyz, nrm_map[:, :, :3]), axis=2).transpose(2, 0, 1)
-        rgb = np.transpose(rgb, (2, 0, 1)) # hwc2chw
+        rgb_c = np.transpose(rgb_c, (2, 0, 1)) # hwc2chw
 
         xyz_lst = [dpt_xyz.transpose(2, 0, 1)] # c, h, w
         msk_lst = [dpt_xyz[2, :, :] > 1e-8]
@@ -309,32 +327,21 @@ class Dataset():
             ).astype(np.int32).squeeze(0)
             inputs['p2r_up_nei_idx%d'%i] = p2r_nei.copy()
 
-        show_rgb = rgb.transpose(1, 2, 0).copy()[:, :, ::-1]
-        if self.debug:
-            for ip, xyz in enumerate(xyz_lst):
-                pcld = xyz.reshape(3, -1).transpose(1, 0)
-                p2ds = bs_utils.project_p3d(pcld, cam_scale, K)
-                print(show_rgb.shape, pcld.shape)
-                srgb = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
-                imshow("rz_pcld_%d" % ip, srgb)
-                p2ds = bs_utils.project_p3d(inputs['cld_xyz%d'%ip], cam_scale, K)
-                srgb1 = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
-                imshow("rz_pcld_%d_rnd" % ip, srgb1)
+        # show_rgb = rgb.transpose(1, 2, 0).copy()[:, :, ::-1]
+        # if self.debug:
+        #     for ip, xyz in enumerate(xyz_lst):
+        #         pcld = xyz.reshape(3, -1).transpose(1, 0)
+        #         p2ds = bs_utils.project_p3d(pcld, cam_scale, K)
+        #         print(show_rgb.shape, pcld.shape)
+        #         srgb = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
+        #         imshow("rz_pcld_%d" % ip, srgb)
+        #         p2ds = bs_utils.project_p3d(inputs['cld_xyz%d'%ip], cam_scale, K)
+        #         srgb1 = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
+        #         imshow("rz_pcld_%d_rnd" % ip, srgb1)
         
-        h = rgb.shape[1]
-        w = rgb.shape[2]
-        angles = np.zeros([3,h,w])
-        angles[0,:,:] = rgb[1,:,:]
-        angles[1,:,:] = rgb[1,:,:]
-        angles[2,:,:] = rgb[1,:,:]
-        sign_angles = np.zeros([3,h,w])
-        sign_angles[0,:,:] = rgb[2,:,:]
-        sign_angles[1,:,:] = rgb[2,:,:]
-        sign_angles[2,:,:] = rgb[2,:,:]
+
         item_dict = dict(
-            angles=angles.astype(np.uint8),  # [c, h, w]
-            sign_angles=sign_angles.astype(np.uint8),  # [c, h, w]
-            rgb=rgb.astype(np.uint8),  # [c, h, w]
+            rgb=rgb_c.astype(np.uint8),  # [c, h, w]
             cld_rgb_nrm=cld_rgb_nrm.astype(np.float32),  # [9, npts]
             choose=choose.astype(np.int32),  # [1, npts]
             labels=labels_pt.astype(np.int32),  # [npts]
@@ -348,14 +355,14 @@ class Dataset():
             kp_3ds=kp3ds.astype(np.float32),
         )
         item_dict.update(inputs)
-        if self.debug:
-            extra_d = dict(
-                dpt_xyz_nrm=dpt_6c.astype(np.float32),  # [6, h, w]
-                cam_scale=np.array([cam_scale]).astype(np.float32),
-                K=K.astype(np.float32),
-            )
-            item_dict.update(extra_d)
-            item_dict['normal_map'] = nrm_map[:, :, :3].astype(np.float32)
+        # if self.debug:
+        #     extra_d = dict(
+        #         dpt_xyz_nrm=dpt_6c.astype(np.float32),  # [6, h, w]
+        #         cam_scale=np.array([cam_scale]).astype(np.float32),
+        #         K=K.astype(np.float32),
+        #     )
+        #     item_dict.update(extra_d)
+        #     item_dict['normal_map'] = nrm_map[:, :, :3].astype(np.float32)
         return item_dict
 
     def get_pose_gt_info(self, cld, labels, cls_id_lst, meta):
@@ -414,52 +421,3 @@ class Dataset():
             return self.get_item(item_name)
 
 
-def main():
-    # config.mini_batch_size = 1
-    global DEBUG
-    DEBUG = True
-    ds = {}
-    ds['train'] = Dataset('train', DEBUG=True)
-    # ds['val'] = Dataset('validation')
-    ds['test'] = Dataset('test', DEBUG=True)
-    idx = dict(
-        train=0,
-        val=0,
-        test=0
-    )
-    while True:
-        # for cat in ['val', 'test']:
-        # for cat in ['train']:
-        for cat in ['test']:
-            datum = ds[cat].__getitem__(idx[cat])
-            idx[cat] += 1
-            K = datum['K']
-            cam_scale = datum['cam_scale']
-            rgb = datum['rgb'].transpose(1, 2, 0)[...,::-1].copy()# [...,::-1].copy()
-            for i in range(22):
-                pcld = datum['cld_rgb_nrm'][:3, :].transpose(1, 0).copy()
-                p2ds = bs_utils.project_p3d(pcld, cam_scale, K)
-                # rgb = bs_utils.draw_p2ds(rgb, p2ds)
-                kp3d = datum['kp_3ds'][i]
-                if kp3d.sum() < 1e-6:
-                    break
-                kp_2ds = bs_utils.project_p3d(kp3d, cam_scale, K)
-                rgb = bs_utils.draw_p2ds(
-                    rgb, kp_2ds, 3, bs_utils.get_label_color(datum['cls_ids'][i][0], mode=1)
-                )
-                ctr3d = datum['ctr_3ds'][i]
-                ctr_2ds = bs_utils.project_p3d(ctr3d[None, :], cam_scale, K)
-                rgb = bs_utils.draw_p2ds(
-                    rgb, ctr_2ds, 4, (0, 0, 255)
-                )
-                imshow('{}_rgb'.format(cat), rgb)
-                cmd = waitKey(0)
-                if cmd == ord('q'):
-                    exit()
-                else:
-                    continue
-
-
-if __name__ == "__main__":
-    main()
-# vim: ts=4 sw=4 sts=4 expandtab

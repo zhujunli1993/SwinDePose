@@ -19,7 +19,8 @@ class BaseOptions():
         g_data.add_argument('--data_root', type=str, help='Dataset Location.')
         g_data.add_argument('--rm_outline', action='store_true', help='Remove points with too small depth value from depth image.')
         g_data.add_argument('--angles_gen', type=str,  help='The C++ codes directory for generating XYZ angles and signed angles file.')
-        
+        g_data.add_argument('--train_list', type=str,  help='training list.')
+        g_data.add_argument('--test_list', type=str,  help='testing list.')
         # Experiment related
         g_exp = parser.add_argument_group('Experiment')
         g_exp.add_argument('--exp_dir', type=str, default='/workspace/REPO/pose_estimation', help='code directory')
@@ -43,7 +44,7 @@ class BaseOptions():
         g_train.add_argument('--log_eval_dir', type=str, default='/workspace/REPO/pose_estimation/ffb6d/train_log/ycb_new/eval_results', help='path to save evaluation results' )
         g_train.add_argument('--save_checkpoint', type=str, default='/workspace/REPO/pose_estimation/ffb6d/train_log/ycb_new/checkpoints', help='path to save checkpoints')
         g_train.add_argument('--load_checkpoint', type=str, help='path to save checkpoints')
-        g_train.add_argument('--log_traininfo_dir', type=str, default='/workspace/REPO/pose_estimationffb6d/train_log/ycb_new/train_info', help='path to save training losses results')
+        g_train.add_argument('--log_traininfo_dir', type=str, default='/workspace/REPO/pose_estimation/ffb6d/train_log/ycb_new/train_info', help='path to save training losses results')
         g_train.add_argument('--n_total_epoch', type=int, default=25, help='epoch numbers')
         g_train.add_argument('--mini_batch_size', type=int, default=8, help='training batch size')
         g_train.add_argument('--val_mini_batch_size', type=int, default=8, help='validation batch size')
@@ -86,18 +87,18 @@ class BaseOptions():
         g_model.add_argument('--resnet_ptr_mdl_p', type=str, default='/workspace/pose-estimation-dls1/ffb6d/models/cnn/ResNet_pretrained_mdl', help='ResNet pretrained model path.')
         
         # RandLA
-        # g_model.add_argument('--k_n', type=int, default=16, help='KNN')
-        # g_model.add_argument('--num_layers', type=int, default=4, help='Number of layers')
+        g_model.add_argument('--k_n', type=int, default=16, help='KNN')
+        g_model.add_argument('--num_layers', type=int, default=4, help='Number of layers')
         # g_model.add_argument('--num_points', type=int, default=480 * 640 // 24, help='Number of input points')
         # g_model.add_argument('--num_classes', type=int, default=22, help='ycb:22 | lm:2')
-        # g_model.add_argument('--sub_grid_size', type=float, default=0.06, help='preprocess_parameter')
-        # g_model.add_argument('--batch_size', type=int, default=3, help='batch_size during training')
-        # g_model.add_argument('--val_batch_size', type=int, default=3, help='batch_size during validation and test')
-        # g_model.add_argument('--train_steps', type=int, default=500, help='Number of steps per epochs')
-        # g_model.add_argument('--val_steps', type=int, default=100, help='Number of validation steps per epoch')
-        # g_model.add_argument('--in_c', type=int, default=9, help='Number of validation steps per epoch')
-        # g_model.add_argument('--sub_sampling_ratio', nargs='+', default=[4,4,4,4], type=int, help='sampling ratio of random sampling at each layer')
-        # g_model.add_argument('--d_out', nargs='+', default=[32, 64, 128, 256], type=int, help='feature dimension')
+        g_model.add_argument('--sub_grid_size', type=float, default=0.06, help='preprocess_parameter')
+        g_model.add_argument('--batch_size', type=int, default=3, help='batch_size during training')
+        g_model.add_argument('--val_batch_size', type=int, default=3, help='batch_size during validation and test')
+        g_model.add_argument('--train_steps', type=int, default=500, help='Number of steps per epochs')
+        g_model.add_argument('--val_steps', type=int, default=100, help='Number of validation steps per epoch')
+        g_model.add_argument('--in_c', type=int, default=12, help='Number of validation steps per epoch')
+        g_model.add_argument('--sub_sampling_ratio', nargs='+', default=[4,4,4,4], type=int, help='sampling ratio of random sampling at each layer')
+        g_model.add_argument('--d_out', nargs='+', default=[32, 64, 128, 256], type=int, help='feature dimension')
         # g_model.add_argument('--num_sub_points', nargs='+', default=[480 * 640 // 24 // 4, 480 * 640 // 24 // 16, 480 * 640 // 24 // 64, 480 * 640 // 24 // 256],  
         #                      help='num_points // 4, num_points // 16, num_points // 64, num_points // 256')        
         

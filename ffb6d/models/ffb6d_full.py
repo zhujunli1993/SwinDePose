@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.cnn.pspnet import PSPNet
+from models.cnn.pspnet_newcnn import PSPNet
 import models.pytorch_utils as pt_utils
 from models.RandLA.RandLANet import Network as RandLANet
 
@@ -207,8 +207,8 @@ class FFB6D(nn.Module):
         Params:
         inputs: dict of :
             rgb         : FloatTensor [bs, 3, h, w]
-            angles      : FloatTensor [bs, 3, h, w]
-            sign_angles : FloatTensor [bs, 3, h, w]
+            # angles      : FloatTensor [bs, 3, h, w]
+            # sign_angles : FloatTensor [bs, 3, h, w]
             dpt_nrm     : FloatTensor [bs, 6, h, w], 3c xyz in meter + 3c normal map
             cld_rgb_nrm : FloatTensor [bs, 9, npts]
             choose      : LongTensor [bs, 1, npts]
@@ -221,11 +221,11 @@ class FFB6D(nn.Module):
         if not end_points:
             end_points = {}
         # ResNet pre + layer1 + layer2
-        angles_emb = self.cnn_pre_stages(inputs['angles']) # stride = 2, [bs, c, 240, 320]
-        sign_angles_emb = self.cnn_pre_stages(inputs['sign_angles']) # stride = 2, [bs, c, 240, 320]
-        rgb_emb = angles_emb + sign_angles_emb
+        # angles_emb = self.cnn_pre_stages(inputs['angles']) # stride = 2, [bs, c, 240, 320]
+        # sign_angles_emb = self.cnn_pre_stages(inputs['sign_angles']) # stride = 2, [bs, c, 240, 320]
+        # rgb_emb = angles_emb + sign_angles_emb
         
-        #rgb_emb = self.cnn_pre_stages(inputs['rgb'])  # stride = 2, [bs, c, 240, 320]
+        rgb_emb = self.cnn_pre_stages(inputs['rgb'])  # stride = 2, [bs, c, 240, 320]
 
         # rndla pre
         xyz, p_emb = self._break_up_pc(inputs['cld_rgb_nrm'])

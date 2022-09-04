@@ -10,20 +10,20 @@ def ensure_fd(fd):
 
 opt = BaseOptions().parse()
 class ConfigRandLA:
-    k_n = 16  # KNN
-    num_layers = 4  # Number of layers
-    num_points = 480 * 640 // 24  # Number of input points
-    num_classes = 22  # Number of valid classes
-    sub_grid_size = 0.06  # preprocess_parameter
+    k_n = opt.k_n  # KNN
+    num_layers = opt.num_layers  # Number of layers
+    num_points = opt.height * opt.width // 24  # Number of input points
+    num_classes = 22  # Number of valid classes, 22 for YCBV dataset
+    sub_grid_size = opt.sub_grid_size  # preprocess_parameter
 
-    batch_size = 3  # batch_size during training
-    val_batch_size = 3  # batch_size during validation and test
-    train_steps = 500  # Number of steps per epochs
-    val_steps = 100  # Number of validation steps per epoch
-    in_c = 12
+    batch_size = opt.batch_size  # batch_size during training
+    val_batch_size = opt.val_batch_size  # batch_size during validation and test
+    train_steps = opt.train_steps  # Number of steps per epochs
+    val_steps = opt.val_steps  # Number of validation steps per epoch
+    in_c = opt.in_c # input channels
 
-    sub_sampling_ratio = [4, 4, 4, 4]  # sampling ratio of random sampling at each layer
-    d_out = [32, 64, 128, 256]  # feature dimension
+    sub_sampling_ratio = opt.sub_sampling_ratio  # sampling ratio of random sampling at each layer
+    d_out = opt.d_out  # feature dimension
     num_sub_points = [num_points // 4, num_points // 16, num_points // 64, num_points // 256]
 
 class Config:
@@ -38,8 +38,8 @@ class Config:
             self.n_objects = 21 + 1  # 21 objects + background
             self.n_classes = self.n_objects
             self.use_orbfps = True
-            self.train_path=os.path.join(self.ycb_root, 'dataset_config', 'train_less_shu.txt')
-            self.test_path=os.path.join(self.ycb_root, 'dataset_config', 'test_less_shu.txt')
+            self.train_path=os.path.join(self.ycb_root, 'dataset_config', opt.train_list)
+            self.test_path=os.path.join(self.ycb_root, 'dataset_config', opt.test_list)
             self.kp_orbfps_dir = os.path.join(self.ycb_root, 'ycb_kps')
             self.kp_orbfps_ptn = os.path.join(self.kp_orbfps_dir, '%s_%d_kps.txt')
             self.ycb_cls_lst_p = os.path.join(self.ycb_root, 'dataset_config', 'classes.txt')

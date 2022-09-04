@@ -323,10 +323,9 @@ class FFB6D(nn.Module):
         # ###################### prediction stages #############################
         rgbd_segs = self.rgbd_seg_layer(rgbd_emb) #[3, 22, 12800]
         
-        #rgbd_segs = 
-        #rgbd_segs = inputs['labels']
-        '''_, cls_rgbd = torch.max(rgbd_segs, 1)
-        print('unique_label: ',torch.unique(inputs['labels'][0]))'''
+        # rgbd_segs = inputs['labels']
+        # _, cls_rgbd = torch.max(rgbd_segs, 1)
+        # print('unique_label: ',torch.unique(inputs['labels'][0]))
         pred_kp_ofs = self.kp_ofst_layer(rgbd_emb)
         pred_ctr_ofs = self.ctr_ofst_layer(rgbd_emb)
 
