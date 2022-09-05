@@ -73,7 +73,7 @@ class BaseOptions():
         
         # Sampling related
         g_sample = parser.add_argument_group('Sampling')
-        g_sample.add_argument('--n_sample_points', type=int, default=480*640//24, help='number of input points')
+        g_sample.add_argument('--n_sample_points', type=int, default=480*640//24, help='number of input points, for ycbv dataset')
         g_sample.add_argument('--n_keypoints', type=int, default=8, help='number of keypoints')
         g_sample.add_argument('--n_min_points', type=int, default=400, help='??')
         g_sample.add_argument('--noise_trans', type=float, default=0.05, help='range of the random noise of translation added to the training data')

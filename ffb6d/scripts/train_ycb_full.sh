@@ -1,6 +1,6 @@
 #!/bin/bash
 # checkpoint to resume.
-tst_mdl=train_log/ycb_all_real_newtrainlist_onlydata/checkpoints/FFB6D_best.pth.tar  
+# tst_mdl=train_log/ycb_all_real_newtrainlist_onlydata/checkpoints/FFB6D_best.pth.tar  
 GPU_NUM=0
 GPU_COUNT=1
 NAME='vtesting'

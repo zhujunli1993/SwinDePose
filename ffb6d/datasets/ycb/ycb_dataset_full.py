@@ -184,6 +184,8 @@ class Dataset():
         return dpt_3d
 
     def get_item(self, item_name):
+        # just for debug
+        item_name='data_syn/013774'
         
         with Image.open(os.path.join(self.root, item_name+'-depth.png')) as di:
             dpt_um = np.array(di)
@@ -213,10 +215,48 @@ class Dataset():
         if self.add_noise and rnd_typ == 'syn':
             rgb = self.rgb_add_noise(rgb)
             rgb_s = self.rgb_add_noise(rgb_s)
+            # Save initial noised images
+            # img = np.uint8((rgb * 0.5 + 0.5)[:, :, ::-1] * 255.0)
+            # img_s = np.uint8((rgb_s * 0.5 + 0.5)[:, :, ::-1] * 255.0)
+            # cv2.imwrite('/workspace/REPO/pose_estimation/check_train_rgb_1.png', img)
+            # cv2.imwrite('/workspace/REPO/pose_estimation/check_train_rgb_s_1.png', img_s)
+            
+            # Add background to initially noised images
             rgb, rgb_s, dpt_um = self.add_real_back(rgb, rgb_s, rgb_labels, dpt_um, msk_dp)
+            
+            # Save noised images with background 
+            # img = np.uint8((rgb * 0.5 + 0.5)[:, :, ::-1] * 255.0)
+            # img_s = np.uint8((rgb_s * 0.5 + 0.5)[:, :, ::-1] * 255.0)
+            # cv2.imwrite('/workspace/REPO/pose_estimation/check_train_rgb_2.png', img)
+            # cv2.imwrite('/workspace/REPO/pose_estimation/check_train_rgb_s_2.png', img_s)
+            
+            # Force adding additional noise
             if self.rng.rand() > 0.8:
                 rgb = self.rgb_add_noise(rgb)
                 rgb_s = self.rgb_add_noise(rgb_s)
+                # Save additional noised images with background 
+                # img = np.uint8((rgb * 0.5 + 0.5)[:, :, ::-1] * 255.0)
+                # img_s = np.uint8((rgb_s * 0.5 + 0.5)[:, :, ::-1] * 255.0)
+                # cv2.imwrite('/workspace/REPO/pose_estimation/check_train_rgb_3.png', img)
+                # cv2.imwrite('/workspace/REPO/pose_estimation/check_train_rgb_s_3.png', img_s)
+        # testing the pts in image
+
+        # rot = render_data['calib'][i,:3, :3]
+        # trans = render_data['calib'][i,:3, 3:4]
+        # pts = torch.addmm(trans, rot, sample_data['samples'][:, sample_data['labels'][0] > 0.5])  # [3, N]
+        # pts = torch.zeros([1, 3])
+        # offset = torch.tensor([0, 0, 0])
+        # pts = torch.add(pts, offset)
+        # pts = torch.addmm(trans, rot, pts.T)  # [3, N]
+        # pts = 0.5 * (pts.numpy().T + 1.0) * render_data['img'].size(2)
+        # p = torch.tensor([0, 0, 0])
+        # p = torch.addmm(trans, rot, p)  # [3, N]
+        # p = 0.5 * (p.numpy().T + 1.0) * render_data['img'].size(2)
+        # for p in pts:
+        #     img = cv2.circle(cv2.UMat(img), (p[0], p[1]), 2, (0,255,0), -1)
+        # print('Original Mesh Center(0,0,0) in image '+str(i)+': ', p)
+
+        
         rgb_c = np.concatenate((rgb, rgb_s), axis=2)  #[h,w,6]
         dpt_um = bs_utils.fill_missing(dpt_um, cam_scale, 1)
         msk_dp = dpt_um > 1e-6
@@ -225,10 +265,11 @@ class Dataset():
         nrm_map = normalSpeed.depth_normal(
             dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False
         )
-        if self.debug:
-            show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
-            imshow("nrm_map", show_nrm_map)
-
+        # save normal map
+        # if True:
+        #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
+        #     cv2.imwrite('/workspace/REPO/pose_estimation/nrm_map.png', show_nrm_map)
+        
         dpt_m = dpt_um.astype(np.float32) / cam_scale
         dpt_xyz = self.dpt_2_pcld(dpt_m, 1.0, K)
 
@@ -278,13 +319,14 @@ class Dataset():
             ys, xs = np.mgrid[:nh, :nw]
             xyz_lst.append(xyz_lst[0][:, ys*scale, xs*scale])
             msk_lst.append(xyz_lst[-1][2, :, :] > 1e-8)
+        
         sr2dptxyz = {
             pow(2, ii): item.reshape(3, -1).transpose(1, 0) for ii, item in enumerate(xyz_lst)
         }
         sr2msk = {
             pow(2, ii): item.reshape(-1) for ii, item in enumerate(msk_lst)
         }
-
+        # below needs checking
         rgb_ds_sr = [4, 8, 8, 8]
         n_ds_layers = 4
         pcld_sub_s_r = [4, 4, 4, 4]
@@ -326,19 +368,20 @@ class Dataset():
                 sr2dptxyz[rgb_up_sr[i]][None, ...], 1
             ).astype(np.int32).squeeze(0)
             inputs['p2r_up_nei_idx%d'%i] = p2r_nei.copy()
-
-        # show_rgb = rgb.transpose(1, 2, 0).copy()[:, :, ::-1]
-        # if self.debug:
-        #     for ip, xyz in enumerate(xyz_lst):
-        #         pcld = xyz.reshape(3, -1).transpose(1, 0)
-        #         p2ds = bs_utils.project_p3d(pcld, cam_scale, K)
-        #         print(show_rgb.shape, pcld.shape)
-        #         srgb = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
-        #         imshow("rz_pcld_%d" % ip, srgb)
-        #         p2ds = bs_utils.project_p3d(inputs['cld_xyz%d'%ip], cam_scale, K)
-        #         srgb1 = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
-        #         imshow("rz_pcld_%d_rnd" % ip, srgb1)
         
+        import pdb; pdb.set_trace()
+        show_rgb = rgb.copy()[:, :, ::-1]
+        if True:
+            for ip, xyz in enumerate(xyz_lst):
+                pcld = xyz.reshape(3, -1).transpose(1, 0)
+                p2ds = bs_utils.project_p3d(pcld, cam_scale, K)
+                print(show_rgb.shape, pcld.shape)
+                srgb = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
+                cv2.imwrite('/workspace/REPO/pose_estimation/rz_pcld_%d.png'% ip, srgb)
+                p2ds = bs_utils.project_p3d(inputs['cld_xyz%d'%ip], cam_scale, K)
+                srgb1 = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
+                cv2.imwrite('/workspace/REPO/pose_estimation/rz_pcld_%d_d_rnd.png'% ip, srgb1)
+        exit()
 
         item_dict = dict(
             rgb=rgb_c.astype(np.uint8),  # [c, h, w]

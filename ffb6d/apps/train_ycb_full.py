@@ -145,22 +145,22 @@ def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
         return None
 
 
-def view_labels(rgb_chw, cld_cn, labels, K=config.intrinsic_matrix['ycb_K1']):
-    rgb_hwc = np.transpose(rgb_chw[0].numpy(), (1, 2, 0)).astype("uint8").copy()
-    cld_nc = np.transpose(cld_cn.numpy(), (1, 0)).copy()
-    p2ds = bs_utils.project_p3d(cld_nc, 1.0, K).astype(np.int32)
-    labels = labels.squeeze().contiguous().cpu().numpy()
-    colors = []
-    h, w = rgb_hwc.shape[0], rgb_hwc.shape[1]
-    rgb_hwc = np.zeros((h, w, 3), "uint8")
-    for lb in labels:
-        if int(lb) == 0:
-            c = (0, 0, 0)
-        else:
-            c = color_lst[int(lb)]
-        colors.append(c)
-    show = bs_utils.draw_p2ds(rgb_hwc, p2ds, 3, colors)
-    return show
+# def view_labels(rgb_chw, cld_cn, labels, K=config.intrinsic_matrix['ycb_K1']):
+#     rgb_hwc = np.transpose(rgb_chw[0].numpy(), (1, 2, 0)).astype("uint8").copy()
+#     cld_nc = np.transpose(cld_cn.numpy(), (1, 0)).copy()
+#     p2ds = bs_utils.project_p3d(cld_nc, 1.0, K).astype(np.int32)
+#     labels = labels.squeeze().contiguous().cpu().numpy()
+#     colors = []
+#     h, w = rgb_hwc.shape[0], rgb_hwc.shape[1]
+#     rgb_hwc = np.zeros((h, w, 3), "uint8")
+#     for lb in labels:
+#         if int(lb) == 0:
+#             c = (0, 0, 0)
+#         else:
+#             c = color_lst[int(lb)]
+#         colors.append(c)
+#     show = bs_utils.draw_p2ds(rgb_hwc, p2ds, 3, colors)
+#     return show
 
 
 def model_fn_decorator(
@@ -226,8 +226,6 @@ def model_fn_decorator(
 
             if not is_eval:
                 if opt.local_rank == 0:
-                    # writer.add_scalars('loss', loss_dict, it)
-                    # writer.add_scalars('train_acc', acc_dict, it)
                     wandb.log({"epoch": epoch,
                             "it": it,
                             "training loss": loss_dict,
