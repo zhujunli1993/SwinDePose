@@ -270,6 +270,7 @@ class Dataset():
         #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
         #     cv2.imwrite('/workspace/REPO/pose_estimation/nrm_map.png', show_nrm_map)
         
+        
         dpt_m = dpt_um.astype(np.float32) / cam_scale
         dpt_xyz = self.dpt_2_pcld(dpt_m, 1.0, K)
 
@@ -299,45 +300,68 @@ class Dataset():
         labels_pt = labels.flatten()[choose]
         choose = np.array([choose])
         cld_rgb_nrm = np.concatenate((cld, rgb_c_pt, nrm_pt), axis=1).transpose(1, 0)
-
+        
+        # Save points with normal
+        # save_file = np.zeros([6, choose.shape[1]])
+        # save_file[0:3,:] = cld.transpose(1,0)
+        # save_file[3:, :] = nrm_pt.transpose(1,0)
+        # np.savetxt('/workspace/REPO/pose_estimation/c_normal.txt',
+        #             save_file.T,
+        #             fmt='%.6f %.6f %.6f %.6f %.6f %.6f',
+        #             comments=''
+        #             )
+        
         cls_id_lst = meta['cls_indexes'].flatten().astype(np.uint32)
         
         RTs, kp3ds, ctr3ds, cls_ids, kp_targ_ofst, ctr_targ_ofst = self.get_pose_gt_info(
             cld, labels_pt, cls_id_lst, meta
         )
 
-        h, w = rgb_labels.shape
-        dpt_6c = np.concatenate((dpt_xyz, nrm_map[:, :, :3]), axis=2).transpose(2, 0, 1)
+        h, w = opt.height, opt.width
         rgb_c = np.transpose(rgb_c, (2, 0, 1)) # hwc2chw
-
+        
         xyz_lst = [dpt_xyz.transpose(2, 0, 1)] # c, h, w
-        msk_lst = [dpt_xyz[2, :, :] > 1e-8]
-
+        
+        # Set downsampling index
         for i in range(3):
             scale = pow(2, i+1)
             nh, nw = h // pow(2, i+1), w // pow(2, i+1)
             ys, xs = np.mgrid[:nh, :nw]
             xyz_lst.append(xyz_lst[0][:, ys*scale, xs*scale])
-            msk_lst.append(xyz_lst[-1][2, :, :] > 1e-8)
+            
         
+        # Save points with normal
+        # save_file = np.zeros([3, choose.shape[1]])
+        # save_file[0:3,:] = cld.transpose(1,0)
+        # save_file[3:, :] = nrm_pt.transpose(1,0)
+        # np.savetxt('/workspace/REPO/pose_estimation/c_normal.txt',
+        #             save_file.T,
+        #             fmt='%.6f %.6f %.6f %.6f %.6f %.6f',
+        #             comments=''
+        #             )
+        
+        # Save each stage of downsampling into a dict
         sr2dptxyz = {
             pow(2, ii): item.reshape(3, -1).transpose(1, 0) for ii, item in enumerate(xyz_lst)
         }
-        sr2msk = {
-            pow(2, ii): item.reshape(-1) for ii, item in enumerate(msk_lst)
-        }
-        # below needs checking
+
+        
         rgb_ds_sr = [4, 8, 8, 8]
         n_ds_layers = 4
         pcld_sub_s_r = [4, 4, 4, 4]
         inputs = {}
+        import pdb; pdb.set_trace()
         # DownSample stage
         for i in range(n_ds_layers):
+            # Obtain each point's 16 neighbors
             nei_idx = DP.knn_search(
                 cld[None, ...], cld[None, ...], 16
             ).astype(np.int32).squeeze(0)
+            # Get subset of points
             sub_pts = cld[:cld.shape[0] // pcld_sub_s_r[i], :]
+            # Get neighbors of sub_pts
             pool_i = nei_idx[:cld.shape[0] // pcld_sub_s_r[i], :]
+            # Obtain each point's 1 neighbors from sub_pts
             up_i = DP.knn_search(
                 sub_pts[None, ...], cld[None, ...], 1
             ).astype(np.int32).squeeze(0)
@@ -345,43 +369,48 @@ class Dataset():
             inputs['cld_nei_idx%d'%i] = nei_idx.astype(np.int32).copy()
             inputs['cld_sub_idx%d'%i] = pool_i.astype(np.int32).copy()
             inputs['cld_interp_idx%d'%i] = up_i.astype(np.int32).copy()
+            # Obtain 16 neighbors of each sub_pts point from each downsampling stage of original xyz.
             nei_r2p = DP.knn_search(
                 sr2dptxyz[rgb_ds_sr[i]][None, ...], sub_pts[None, ...], 16
             ).astype(np.int32).squeeze(0)
             inputs['r2p_ds_nei_idx%d'%i] = nei_r2p.copy()
+            # Obtain 1 neighbors of each downsampling stage of original xyz from each sub_pts point.
             nei_p2r = DP.knn_search(
                 sub_pts[None, ...], sr2dptxyz[rgb_ds_sr[i]][None, ...], 1
             ).astype(np.int32).squeeze(0)
             inputs['p2r_ds_nei_idx%d'%i] = nei_p2r.copy()
+            # Update cld to sub_pts, like downsampling. 
             cld = sub_pts
 
         n_up_layers = 3
         rgb_up_sr = [4, 2, 2]
         for i in range(n_up_layers):
+            # Obtain 16 neighbors of each cld point from each downsampling stage of original xyz.
             r2p_nei = DP.knn_search(
                 sr2dptxyz[rgb_up_sr[i]][None, ...],
                 inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...], 16
             ).astype(np.int32).squeeze(0)
             inputs['r2p_up_nei_idx%d'%i] = r2p_nei.copy()
+            # Obtain 1 neighbors of each point from 
             p2r_nei = DP.knn_search(
                 inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...],
                 sr2dptxyz[rgb_up_sr[i]][None, ...], 1
             ).astype(np.int32).squeeze(0)
             inputs['p2r_up_nei_idx%d'%i] = p2r_nei.copy()
         
-        import pdb; pdb.set_trace()
-        show_rgb = rgb.copy()[:, :, ::-1]
-        if True:
-            for ip, xyz in enumerate(xyz_lst):
-                pcld = xyz.reshape(3, -1).transpose(1, 0)
-                p2ds = bs_utils.project_p3d(pcld, cam_scale, K)
-                print(show_rgb.shape, pcld.shape)
-                srgb = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
-                cv2.imwrite('/workspace/REPO/pose_estimation/rz_pcld_%d.png'% ip, srgb)
-                p2ds = bs_utils.project_p3d(inputs['cld_xyz%d'%ip], cam_scale, K)
-                srgb1 = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
-                cv2.imwrite('/workspace/REPO/pose_estimation/rz_pcld_%d_d_rnd.png'% ip, srgb1)
-        exit()
+        
+        # show_rgb = rgb.copy()[:, :, ::-1]
+        # if True:
+        #     for ip, xyz in enumerate(xyz_lst):
+        #         pcld = xyz.reshape(3, -1).transpose(1, 0)
+        #         p2ds = bs_utils.project_p3d(pcld, cam_scale, K)
+        #         print(show_rgb.shape, pcld.shape)
+        #         srgb = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
+        #         cv2.imwrite('/workspace/REPO/pose_estimation/rz_pcld_%d.png'% ip, srgb)
+        #         p2ds = bs_utils.project_p3d(inputs['cld_xyz%d'%ip], cam_scale, K)
+        #         srgb1 = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
+        #         cv2.imwrite('/workspace/REPO/pose_estimation/rz_pcld_%d_d_rnd.png'% ip, srgb1)
+        
 
         item_dict = dict(
             rgb=rgb_c.astype(np.uint8),  # [c, h, w]
