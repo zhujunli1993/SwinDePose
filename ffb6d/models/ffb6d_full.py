@@ -224,11 +224,11 @@ class FFB6D(nn.Module):
         # angles_emb = self.cnn_pre_stages(inputs['angles']) # stride = 2, [bs, c, 240, 320]
         # sign_angles_emb = self.cnn_pre_stages(inputs['sign_angles']) # stride = 2, [bs, c, 240, 320]
         # rgb_emb = angles_emb + sign_angles_emb
-        
-        rgb_emb = self.cnn_pre_stages(inputs['rgb'])  # stride = 2, [bs, c, 240, 320]
+        import pdb; pdb.set_trace()
+        rgb_emb = self.cnn_pre_stages(inputs['rgb'])  
 
         # rndla pre
-        xyz, p_emb = self._break_up_pc(inputs['cld_rgb_nrm'])
+        # xyz, p_emb = self._break_up_pc(inputs['cld_rgb_nrm'])
         p_emb = inputs['cld_rgb_nrm']
         p_emb = self.rndla_pre_stages(p_emb)
         p_emb = p_emb.unsqueeze(dim=3)  # Batch*channel*npoints*1
@@ -373,19 +373,3 @@ class DenseFusion(nn.Module):
         ap_x = ap_x.view(-1, 1024, 1).repeat(1, 1, n_pts)
         return torch.cat([feat_1, feat_2, ap_x], 1)  # 96+ 512 + 1024 = 1632
 
-
-def main():
-    from common import ConfigRandLA
-    rndla_cfg = ConfigRandLA
-
-    n_cls = 22
-    model = FFB6D(n_cls, rndla_cfg.num_points, rndla_cfg)
-    print(model)
-
-    print(
-        "model parameters:", sum(param.numel() for param in model.parameters())
-    )
-
-
-if __name__ == "__main__":
-    main()

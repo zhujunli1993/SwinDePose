@@ -15,8 +15,6 @@ import shutil
 # import argparse
 import resource
 import numpy as np
-import pickle as pkl
-from collections import namedtuple
 
 import torch
 import torch.optim as optim
@@ -42,7 +40,6 @@ from models.loss import OFLoss, FocalLoss
 from apex.parallel import DistributedDataParallel
 from apex.parallel import convert_syncbn_model
 from apex import amp
-from apex.multi_tensor_apply import multi_tensor_applier
 
 # get options
 opt = BaseOptions().parse()

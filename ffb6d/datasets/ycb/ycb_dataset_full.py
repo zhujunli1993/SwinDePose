@@ -350,14 +350,14 @@ class Dataset():
         n_ds_layers = 4
         pcld_sub_s_r = [4, 4, 4, 4]
         inputs = {}
-        import pdb; pdb.set_trace()
+        
         # DownSample stage
         for i in range(n_ds_layers):
             # Obtain each point's 16 neighbors
             nei_idx = DP.knn_search(
                 cld[None, ...], cld[None, ...], 16
             ).astype(np.int32).squeeze(0)
-            # Get subset of points
+            # Get subset of points 
             sub_pts = cld[:cld.shape[0] // pcld_sub_s_r[i], :]
             # Get neighbors of sub_pts
             pool_i = nei_idx[:cld.shape[0] // pcld_sub_s_r[i], :]
@@ -369,19 +369,41 @@ class Dataset():
             inputs['cld_nei_idx%d'%i] = nei_idx.astype(np.int32).copy()
             inputs['cld_sub_idx%d'%i] = pool_i.astype(np.int32).copy()
             inputs['cld_interp_idx%d'%i] = up_i.astype(np.int32).copy()
-            # Obtain 16 neighbors of each sub_pts point from each downsampling stage of original xyz.
+            # Obtain 16 neighbors of each sub_pts point from third and fourth level of original xyz converted from depth image.
             nei_r2p = DP.knn_search(
                 sr2dptxyz[rgb_ds_sr[i]][None, ...], sub_pts[None, ...], 16
             ).astype(np.int32).squeeze(0)
             inputs['r2p_ds_nei_idx%d'%i] = nei_r2p.copy()
-            # Obtain 1 neighbors of each downsampling stage of original xyz from each sub_pts point.
+            
+            
+            # save nei_r2p points
+            # save_file = np.zeros([sr2dptxyz[rgb_ds_sr[i]].shape[0], 6])
+            # save_file[:, 0:3] = sr2dptxyz[rgb_ds_sr[i]][None, ...]
+            # save_file[:, 3:] = np.full((sr2dptxyz[rgb_ds_sr[i]].shape[0],3), [24,225,77])
+            # np.savetxt('/workspace/REPO/pose_estimation/sr2dptxyz_%d_%d.txt'%(rgb_ds_sr[i],i),
+            #             save_file,
+            #             fmt='%.6f %.6f %.6f %.6f %.6f %.6f',
+            #             comments=''
+            #             )
+
+            # Obtain 1 neighbors of each third and fourth level of original xyz points, converted from depth image, from each sub_pts point.
             nei_p2r = DP.knn_search(
                 sub_pts[None, ...], sr2dptxyz[rgb_ds_sr[i]][None, ...], 1
             ).astype(np.int32).squeeze(0)
             inputs['p2r_ds_nei_idx%d'%i] = nei_p2r.copy()
+            
             # Update cld to sub_pts, like downsampling. 
             cld = sub_pts
-
+            
+            # save cld
+            # save_file = np.zeros([cld.shape[0], 3])
+            # save_file = cld
+            # np.savetxt('/workspace/REPO/pose_estimation/cld_%d.txt'%i,
+            #             save_file,
+            #             fmt='%.6f %.6f %.6f',
+            #             comments=''
+            #             )
+        
         n_up_layers = 3
         rgb_up_sr = [4, 2, 2]
         for i in range(n_up_layers):
@@ -391,7 +413,18 @@ class Dataset():
                 inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...], 16
             ).astype(np.int32).squeeze(0)
             inputs['r2p_up_nei_idx%d'%i] = r2p_nei.copy()
-            # Obtain 1 neighbors of each point from 
+            
+            
+            # save r2p_nei points
+            # save_file = np.zeros([sr2dptxyz[rgb_up_sr[i]].shape[0], 6])
+            # save_file[:, 0:3] = sr2dptxyz[rgb_up_sr[i]][None, ...]
+            # save_file[:, 3:] = np.full((sr2dptxyz[rgb_up_sr[i]].shape[0],3), [24,225,77])
+            # np.savetxt('/workspace/REPO/pose_estimation/sr2dptxyz_up_%d_%d.txt'%(rgb_up_sr[i],i),
+            #             save_file,
+            #             fmt='%.6f %.6f %.6f %.6f %.6f %.6f',
+            #             comments=''
+            #             )
+            # Obtain 1 neighbors of each downsampling stage of original xyz from cld points
             p2r_nei = DP.knn_search(
                 inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...],
                 sr2dptxyz[rgb_up_sr[i]][None, ...], 1
