@@ -224,7 +224,7 @@ class FFB6D(nn.Module):
         # angles_emb = self.cnn_pre_stages(inputs['angles']) # stride = 2, [bs, c, 240, 320]
         # sign_angles_emb = self.cnn_pre_stages(inputs['sign_angles']) # stride = 2, [bs, c, 240, 320]
         # rgb_emb = angles_emb + sign_angles_emb
-        import pdb; pdb.set_trace()
+        
         rgb_emb = self.cnn_pre_stages(inputs['rgb'])  
 
         # rndla pre
@@ -235,18 +235,17 @@ class FFB6D(nn.Module):
 
         # ###################### encoding stages #############################
         ds_emb = []
+        import pdb; pdb.set_trace()
         for i_ds in range(4):
             # encode rgb downsampled feature
             rgb_emb0 = self.cnn_ds_stages[i_ds](rgb_emb)
-            
             bs, c, hr, wr = rgb_emb0.size()
 
             # encode point cloud downsampled feature
             f_encoder_i = self.rndla_ds_stages[i_ds](
                 p_emb, inputs['cld_xyz%d' % i_ds], inputs['cld_nei_idx%d' % i_ds]
             )
-            f_sampled_i = self.random_sample(f_encoder_i, inputs['cld_sub_idx%d' % i_ds])
-            p_emb0 = f_sampled_i
+            p_emb0 = self.random_sample(f_encoder_i, inputs['cld_sub_idx%d' % i_ds])
             if i_ds == 0:
                 ds_emb.append(f_encoder_i)
 

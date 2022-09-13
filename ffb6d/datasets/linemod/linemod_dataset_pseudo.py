@@ -50,13 +50,13 @@ class Dataset():
                 self.cls_root, "train.txt"
             )
             self.real_lst = self.bs_utils.read_lines(real_img_pth)
-
-            rnd_img_ptn = os.path.join(
+            
+            '''rnd_img_ptn = os.path.join(
                 self.root, 'renders/%s/*.pkl' % cls_type
             )
-            self.rnd_lst = glob(rnd_img_ptn)
-            #rnd_img_ptn = os.path.join(self.root, 'renders/%s' % cls_type, 'file_list.txt') # Because the original real rbg data in renders/ have been removed
-            #self.rnd_lst = self.bs_utils.read_lines(rnd_img_ptn)
+            self.rnd_lst = glob(rnd_img_ptn)'''
+            rnd_img_ptn = os.path.join(self.root, 'renders/%s' % cls_type, 'file_list.txt')
+            self.rnd_lst = self.bs_utils.read_lines(rnd_img_ptn)
             print("render data length: ", len(self.rnd_lst))
             if len(self.rnd_lst) == 0:
                 warning = "Warning: "
@@ -64,12 +64,12 @@ class Dataset():
                 warning += "Please generate rendered data from https://github.com/ethnhe/raster_triangle.\n"
                 print(colored(warning, "red", attrs=['bold']))
 
-            fuse_img_ptn = os.path.join(
+            '''fuse_img_ptn = os.path.join(
                 self.root, 'fuse/%s/*.pkl' % cls_type
             )
-            self.fuse_lst = glob(fuse_img_ptn)
-            #fuse_img_ptn = os.path.join(self.root, 'fuse/%s' % cls_type, 'file_list.txt')
-            #self.fuse_lst = self.bs_utils.read_lines(fuse_img_ptn)
+            self.fuse_lst = glob(fuse_img_ptn)'''
+            fuse_img_ptn = os.path.join(self.root, 'fuse/%s' % cls_type, 'file_list.txt')
+            self.fuse_lst = self.bs_utils.read_lines(fuse_img_ptn)
             print("fused data length: ", len(self.fuse_lst))
             if len(self.fuse_lst) == 0:
                 warning = "Warning: "
@@ -147,6 +147,7 @@ class Dataset():
         rng = self.rng
         # apply HSV augmentor
         if rng.rand() > 0:
+            
             hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV).astype(np.uint16)
             hsv_img[:, :, 1] = hsv_img[:, :, 1] * self.rand_range(rng, 1-0.25, 1+.25)
             hsv_img[:, :, 2] = hsv_img[:, :, 2] * self.rand_range(rng, 1-.15, 1+.15)
@@ -176,7 +177,7 @@ class Dataset():
         bk_label = (bk_label < 255).astype(rgb.dtype)
         if len(bk_label.shape) > 2:
             bk_label = bk_label[:, :, 0]
-        with Image.open(os.path.join(self.cls_root, "rgb", real_item+'.png')) as ri:
+        with Image.open(os.path.join(self.cls_root, "pseudo_angles", real_item+'.png')) as ri:
             back = np.array(ri)[:, :, :3] * bk_label[:, :, None]
         dpt_back = real_dpt.astype(np.float32) * bk_label.astype(np.float32)
 
@@ -204,11 +205,12 @@ class Dataset():
 
     def get_item(self, item_name):
         if "pkl" in item_name:
-            item_name_full = os.path.join(self.config.lm_root, item_name)
+            #item_name_full = os.path.join(self.config.lm_root, item_name)
             data = pkl.load(open(item_name, "rb"))
             dpt_mm = data['depth'] * 1000.
-            rgb = data['rgb']
+            rgb = data['angles'] # data['rgb'] actually contains pseudo angles image with background
             rgb = np.float32(rgb)
+            
             labels = data['mask']
             K = data['K']
             RT = data['RT']
@@ -223,7 +225,7 @@ class Dataset():
             with Image.open(os.path.join(self.cls_root, "mask/{}.png".format(item_name))) as li:
                 labels = np.array(li)
                 labels = (labels > 0).astype("uint8")
-            with Image.open(os.path.join(self.cls_root, "rgb/{}.png".format(item_name))) as ri:
+            with Image.open(os.path.join(self.cls_root, "pseudo_angles/{}.png".format(item_name))) as ri:
                 if self.add_noise:
                     ri = self.trancolor(ri)
                 rgb = np.array(ri)[:, :, :3]
