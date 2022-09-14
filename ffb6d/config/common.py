@@ -50,6 +50,7 @@ class Config:
             self.ycb_cls_lst = self.read_lines(self.ycb_cls_lst_p)
             self.ycb_sym_cls_ids = [13, 16, 19, 20, 21]
         else:  # linemod
+            cls_type = opt.linemod_cls
             self.n_objects = 1 + 1  # 1 object + background
             self.n_classes = self.n_objects
             self.lm_cls_lst = [
@@ -71,31 +72,37 @@ class Config:
                 'lamp': 14,
                 'phone': 15,
             }
+            
             try:
                 self.cls_id = self.lm_obj_dict[cls_type]
             except Exception:
                 pass
+            
             self.lm_id2obj_dict = dict(
                 zip(self.lm_obj_dict.values(), self.lm_obj_dict.keys())
             )
-            self.lm_root = os.path.abspath(
-                os.path.join(self.exp_dir, 'datasets/linemod/')
-            )
+            self.lm_root = opt.data_root
+            self.cls_root = os.path.join(self.lm_root, "data/%02d/" % self.cls_id)
+            self.train_path = os.path.join(self.cls_root, opt.train_list)
+            self.render_path = os.path.join(self.lm_root, 'renders/%s/*.pkl' % cls_type)
+            self.fuse_path = os.path.join(self.lm_root, 'fuse/%s/*.pkl' % cls_type)
+            self.test_path = os.path.join(self.cls_root, opt.test_list)
+            
             self.use_orbfps = True
-            self.kp_orbfps_dir = 'datasets/linemod/kps_orb9_fps/'
+            self.kp_orbfps_dir = os.path.join(self.lm_root, 'kps_orb9_fps')
+            
             self.kp_orbfps_ptn = os.path.join(self.kp_orbfps_dir, '%s_%d_kps.txt')
             # FPS
-            self.lm_fps_kps_dir = os.path.abspath(
-                os.path.join(self.exp_dir, 'datasets/linemod/lm_obj_kps/')
-            )
+            self.lm_fps_kps_dir = os.path.join(self.lm_root, 'lm_obj_kps')
 
             lm_r_pth = os.path.join(self.lm_root, "dataset_config/models_info.yml")
             lm_r_file = open(os.path.join(lm_r_pth), "r")
-            
             self.lm_r_lst = yaml.load(lm_r_file)
 
             self.val_nid_ptn = "/data/6D_Pose_Data/datasets/LINEMOD/pose_nori_lists/{}_real_val.nori.list"
-
+            
+            
+            
         self.intrinsic_matrix = {
             'linemod': np.array([[572.4114, 0.,         325.2611],
                                 [0.,        573.57043,  242.04899],
