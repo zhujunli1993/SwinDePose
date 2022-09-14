@@ -29,11 +29,10 @@ class Dataset():
 
     def __init__(self, dataset_name, DEBUG=False):
         self.dataset_name = dataset_name
-        self.img_width = 480
-        self.img_length = 640
+        
         self.debug = DEBUG
-        self.xmap = np.array([[j for i in range(self.img_length)] for j in range(self.img_width)])
-        self.ymap = np.array([[i for i in range(self.img_length)] for j in range(self.img_width)])
+        self.xmap = np.array([[j for i in range(opt.width)] for j in range(opt.height)])
+        self.ymap = np.array([[i for i in range(opt.width)] for j in range(opt.height)])
         self.diameters = {}
         self.trancolor = transforms.ColorJitter(0.2, 0.2, 0.2, 0.05)
         self.norm = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.224])
@@ -185,7 +184,7 @@ class Dataset():
 
     def get_item(self, item_name):
         # just for debug
-        item_name='data_syn/013774'
+        
         
         with Image.open(os.path.join(self.root, item_name+'-depth.png')) as di:
             dpt_um = np.array(di)

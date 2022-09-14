@@ -12,7 +12,6 @@ ROOT_PATH = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 import time
 import tqdm
 import shutil
-# import argparse
 import resource
 import numpy as np
 

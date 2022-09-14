@@ -15,14 +15,14 @@ except Exception:
     from cv2 import imshow, waitKey
 
 opt = BaseOptions().parse()
-config = Config(ds_name='ycb')
-bs_utils = Basic_Utils(config)
-cls_lst = config.ycb_cls_lst
-try:
-    config_lm = Config(ds_name="linemod")
+if opt.dataset_name=='linemod':
+    config_lm = Config(ds_name="linemod", cls_type=opt.linemod_cls)
     bs_utils_lm = Basic_Utils(config_lm)
-except Exception as ex:
-    print(ex)
+else:
+    config = Config(ds_name='ycb')
+    bs_utils = Basic_Utils(config)
+    cls_lst = config.ycb_cls_lst
+
 
 
 def best_fit_transform(A, B):
