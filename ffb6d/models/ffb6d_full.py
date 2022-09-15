@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.cnn.pspnet_newcnn import PSPNet
+from models.cnn.pspnet import PSPNet
 import models.pytorch_utils as pt_utils
 from models.RandLA.RandLANet import Network as RandLANet
 
@@ -235,7 +235,7 @@ class FFB6D(nn.Module):
 
         # ###################### encoding stages #############################
         ds_emb = []
-        import pdb; pdb.set_trace()
+        
         for i_ds in range(4):
             # encode rgb downsampled feature
             rgb_emb0 = self.cnn_ds_stages[i_ds](rgb_emb)

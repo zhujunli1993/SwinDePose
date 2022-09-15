@@ -8,7 +8,12 @@ import torch.utils.model_zoo as model_zoo
 from config.options import BaseOptions
 from config.common import Config
 opt = BaseOptions().parse()
-config = Config(ds_name='ycb')
+if opt.dataset_name=='ycb':
+    config = Config(ds_name='ycb')
+else:   
+    config = Config(ds_name=opt.dataset_name, cls_type=opt.linemod_cls)
+
+
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152']
 
@@ -122,7 +127,11 @@ class ResNet(nn.Module):
         self.inplanes = 64
         self.fully_conv = fully_conv
         super(ResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+        if opt.full==True:
+            self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+        else:
+            self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
@@ -250,7 +259,7 @@ def resnet152(pretrained=False):
         print("loading resnet152 pretrained mdl.")
         model.load_state_dict(
             model_zoo.load_url(
-                model_urls['resnet152'], model_dir=config.resnet_ptr_mdl_p
+                model_urls['resnet152'], model_dir=opt.resnet_ptr_mdl_p
             )
         )
     return model

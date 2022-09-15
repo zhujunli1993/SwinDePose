@@ -50,11 +50,11 @@ class Dataset():
             real_img_pth = self.config.train_path
             self.real_lst = self.bs_utils.read_lines(real_img_pth)
             
-            rnd_img_ptn = self.config.render_path
-            self.rnd_lst = glob(rnd_img_ptn)
-            
             # rnd_img_ptn = self.config.render_path
-            # self.rnd_lst = self.bs_utils.read_lines(rnd_img_ptn)
+            # self.rnd_lst = glob(rnd_img_ptn)
+            # Remove render images
+            self.rnd_lst=[]
+            
             print("render data length: ", len(self.rnd_lst))
             if len(self.rnd_lst) == 0:
                 warning = "Warning: "
@@ -62,10 +62,10 @@ class Dataset():
                 warning += "Please generate rendered data from https://github.com/ethnhe/raster_triangle.\n"
                 print(warning)
 
-            fuse_img_ptn = self.config.fuse_path
-            self.fuse_lst = glob(fuse_img_ptn)
             # fuse_img_ptn = self.config.fuse_path
-            # self.fuse_lst = self.bs_utils.read_lines(fuse_img_ptn)
+            # self.fuse_lst = glob(fuse_img_ptn)
+            # Remove fuse images
+            self.fuse_lst=[]
             print("fused data length: ", len(self.fuse_lst))
             if len(self.fuse_lst) == 0:
                 warning = "Warning: "
@@ -205,8 +205,9 @@ class Dataset():
         return dpt_3d
 
     def get_item(self, item_name):
-        import pdb; pdb.set_trace()
+        
         if "pkl" in item_name:
+            
             #item_name_full = os.path.join(self.config.lm_root, item_name)
             data = pkl.load(open(item_name, "rb"))
             dpt_mm = data['depth'] * 1000.
@@ -222,6 +223,7 @@ class Dataset():
             else:
                 labels = (labels > 0).astype("uint8")
         else:
+        
             with Image.open(os.path.join(self.cls_root, "depth/{}.png".format(item_name))) as di:
                 dpt_mm = np.array(di)
             with Image.open(os.path.join(self.cls_root, "mask/{}.png".format(item_name))) as li:
@@ -249,6 +251,8 @@ class Dataset():
             RT = np.concatenate((R, T[:, None]), axis=1)
             rnd_typ = 'real'
             K = self.config.intrinsic_matrix["linemod"]
+        
+        
         cam_scale = 1000.0
         if len(labels.shape) > 2:
             labels = labels[:, :, 0]
@@ -264,9 +268,10 @@ class Dataset():
             if self.rng.rand() > 0.8:
                 rgb = self.rgb_add_noise(rgb)
                 rgb_s = self.rgb_add_noise(rgb_s)
-                
-        rgb_c = np.concatenate((rgb, rgb_s), axis=2)  #[h,w,6]
-        
+        if self.opt.full:        
+            rgb_c = np.concatenate((rgb, rgb_s), axis=2)  #[h,w,6]
+        else:
+            rgb_c = rgb
         dpt_mm = dpt_mm.copy().astype(np.uint16)
         nrm_map = normalSpeed.depth_normal(
             dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False
@@ -301,8 +306,10 @@ class Dataset():
         choose = choose[sf_idx]
 
         cld = dpt_xyz.reshape(-1, 3)[choose, :]
-        rgb_c_pt = rgb_c.reshape(-1, 6)[choose, :].astype(np.float32)
-        
+        if self.opt.full: 
+            rgb_c_pt = rgb_c.reshape(-1, 6)[choose, :].astype(np.float32)
+        else:
+            rgb_c_pt = rgb_c.reshape(-1, 3)[choose, :].astype(np.float32)
         nrm_pt = nrm_map[:, :, :3].reshape(-1, 3)[choose, :]
         labels_pt = labels.flatten()[choose]
         choose = np.array([choose])
@@ -459,6 +466,7 @@ class Dataset():
         return len(self.all_lst)
 
     def __getitem__(self, idx):
+        
         if self.dataset_name == 'train':
             item_name = self.real_syn_gen()
             data = self.get_item(item_name)

@@ -263,9 +263,6 @@ def cal_frame_poses_lm(
             kp_2ds = bs_utils.project_p3d(
                 cls_kps[cls_id].cpu().numpy(), 1000.0, K='linemod'
             )
-            # print("cls_id = ", cls_id)
-            # print("kp3d:", cls_kps[cls_id])
-            # print("kp2d:", kp_2ds, "\n")
             color = (0, 0, 255)  # bs_utils.get_label_color(cls_id.item())
             show_kp_img = bs_utils.draw_p2ds(show_kp_img, kp_2ds, r=3, color=color)
             imshow("kp: cls_id=%d" % cls_id, show_kp_img)

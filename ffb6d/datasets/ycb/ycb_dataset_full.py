@@ -255,8 +255,10 @@ class Dataset():
         #     img = cv2.circle(cv2.UMat(img), (p[0], p[1]), 2, (0,255,0), -1)
         # print('Original Mesh Center(0,0,0) in image '+str(i)+': ', p)
 
-        
-        rgb_c = np.concatenate((rgb, rgb_s), axis=2)  #[h,w,6]
+        if opt.full==True:
+            rgb_c = np.concatenate((rgb, rgb_s), axis=2)  #[h,w,6]
+        else:
+            rgb_c = rgb
         dpt_um = bs_utils.fill_missing(dpt_um, cam_scale, 1)
         msk_dp = dpt_um > 1e-6
 
@@ -293,8 +295,10 @@ class Dataset():
         choose = choose[sf_idx]
 
         cld = dpt_xyz.reshape(-1, 3)[choose, :]
-        rgb_c_pt = rgb_c.reshape(-1, 6)[choose, :].astype(np.float32)
-        
+        if opt.full==True:
+            rgb_c_pt = rgb_c.reshape(-1, 6)[choose, :].astype(np.float32)
+        else:
+            rgb_c_pt = rgb_c.reshape(-1, 3)[choose, :].astype(np.float32)
         nrm_pt = nrm_map[:, :, :3].reshape(-1, 3)[choose, :]
         labels_pt = labels.flatten()[choose]
         choose = np.array([choose])
