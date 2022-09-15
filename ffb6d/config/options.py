@@ -87,7 +87,7 @@ class BaseOptions():
         
         # General
         g_model.add_argument('--resnet_ptr_mdl_p', type=str, default='/workspace/pose-estimation-dls1/ffb6d/models/cnn/ResNet_pretrained_mdl', help='ResNet pretrained model path.')
-        
+        g_model.add_argument('--full', action='store_true', help='using both angles and signed angles.')
         # RandLA
         g_model.add_argument('--k_n', type=int, default=16, help='KNN')
         g_model.add_argument('--num_layers', type=int, default=4, help='Number of layers')

@@ -51,12 +51,12 @@ class Dataset():
             )
             self.real_lst = self.bs_utils.read_lines(real_img_pth)
 
-            rnd_img_ptn = os.path.join(
-                self.root, 'renders/%s/*.pkl' % cls_type
-            )
-            self.rnd_lst = glob(rnd_img_ptn)
-            #rnd_img_ptn = os.path.join(self.root, 'renders/%s' % cls_type, 'file_list.txt') # Because the original real rbg data in renders/ have been removed
-            #self.rnd_lst = self.bs_utils.read_lines(rnd_img_ptn)
+            # rnd_img_ptn = os.path.join(
+            #     self.root, 'renders/%s/*.pkl' % cls_type
+            # )
+            # self.rnd_lst = glob(rnd_img_ptn)
+            # Remove render images
+            self.rnd_lst=[]
             print("render data length: ", len(self.rnd_lst))
             if len(self.rnd_lst) == 0:
                 warning = "Warning: "
@@ -64,12 +64,12 @@ class Dataset():
                 warning += "Please generate rendered data from https://github.com/ethnhe/raster_triangle.\n"
                 print(colored(warning, "red", attrs=['bold']))
 
-            fuse_img_ptn = os.path.join(
-                self.root, 'fuse/%s/*.pkl' % cls_type
-            )
-            self.fuse_lst = glob(fuse_img_ptn)
-            #fuse_img_ptn = os.path.join(self.root, 'fuse/%s' % cls_type, 'file_list.txt')
-            #self.fuse_lst = self.bs_utils.read_lines(fuse_img_ptn)
+            # fuse_img_ptn = os.path.join(
+            #     self.root, 'fuse/%s/*.pkl' % cls_type
+            # )
+            # self.fuse_lst = glob(fuse_img_ptn)
+            # Remove fuse images
+            self.fuse_lst=[]
             print("fused data length: ", len(self.fuse_lst))
             if len(self.fuse_lst) == 0:
                 warning = "Warning: "

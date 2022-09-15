@@ -65,8 +65,6 @@ for i in range(config.n_objects):
     color_lst.append(color)
 
 
-os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpu
-
 
 lr_clip = 1e-5
 bnm_clip = 1e-2

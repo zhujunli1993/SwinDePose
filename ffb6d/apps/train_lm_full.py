@@ -63,7 +63,7 @@ for i in range(config.n_objects):
     col_mul = (255 * 255 * 255) // (i+1)
     color = (col_mul//(255*255), (col_mul//255) % 255, col_mul % 255)
     color_lst.append(color)
-os.environ['CUDA_VISIBLE_DEVICES'] = opt.gpu
+
 
 
 
@@ -500,6 +500,7 @@ class Trainer(object):
 
 
 def train():
+    
     print("local_rank:", opt.local_rank)
     cudnn.benchmark = True
     if opt.deterministic:
