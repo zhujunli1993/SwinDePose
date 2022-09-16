@@ -24,7 +24,7 @@ class PSPModule(nn.Module):
     def forward(self, feats):
         h, w = feats.size(2), feats.size(3)
         priors = [
-            F.upsample(input=stage(feats), size=(h, w), mode='bilinear')
+            F.interpolate(input=stage(feats), size=(h, w), mode='bilinear')
             for stage in self.stages
         ] + [feats]
         bottle = self.bottleneck(torch.cat(priors, 1))
@@ -36,6 +36,7 @@ class PSPUpsample(nn.Module):
         super(PSPUpsample, self).__init__()
         self.conv = nn.Sequential(
             nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
+            # F.interpolate(scale_factor=2, mode='bilinear', align_corners=True),
             nn.Conv2d(in_channels, out_channels, 3, padding=1),
             nn.BatchNorm2d(out_channels),
             nn.PReLU()

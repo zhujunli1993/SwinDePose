@@ -44,7 +44,7 @@ class Dataset():
         self.cls_root = self.config.cls_root
         self.rng = np.random
         meta_file = open(os.path.join(self.cls_root, 'gt.yml'), "r")
-        self.meta_lst = yaml.load(meta_file)
+        self.meta_lst = yaml.safe_load(meta_file)
         if dataset_name == 'train':
             self.add_noise = True
             real_img_pth = self.config.train_path

@@ -43,10 +43,10 @@ class BaseOptions():
         
         # Training related
         g_train = parser.add_argument_group('Training')
-        g_train.add_argument('--log_eval_dir', type=str, default='/workspace/REPO/pose_estimation/ffb6d/train_log/ycb_new/eval_results', help='path to save evaluation results' )
-        g_train.add_argument('--save_checkpoint', type=str, default='/workspace/REPO/pose_estimation/ffb6d/train_log/ycb_new/checkpoints', help='path to save checkpoints')
-        g_train.add_argument('--load_checkpoint', type=str, help='path to save checkpoints')
-        g_train.add_argument('--log_traininfo_dir', type=str, default='/workspace/REPO/pose_estimation/ffb6d/train_log/ycb_new/train_info', help='path to save training losses results')
+        g_train.add_argument('--log_eval_dir', type=str, help='path to save evaluation results' )
+        g_train.add_argument('--save_checkpoint', type=str, help='path to save checkpoints')
+        g_train.add_argument('--load_checkpoint', type=str, help='path to load checkpoints')
+        g_train.add_argument('--log_traininfo_dir', type=str, help='path to save training losses results')
         g_train.add_argument('--n_total_epoch', type=int, default=25, help='epoch numbers')
         g_train.add_argument('--mini_batch_size', type=int, default=8, help='training batch size')
         g_train.add_argument('--val_mini_batch_size', type=int, default=8, help='validation batch size')

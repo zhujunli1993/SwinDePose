@@ -606,7 +606,7 @@ class Basic_Utils():
                     self.config.lm_kps_dir, "{}/{}.txt".format(cls, kp_type)
                 )
                 kps_pth = kps_pattern.format(cls)
-            print("kps_pth in get_kps:", kps_pth)
+            
             kps = np.loadtxt(kps_pth, dtype=np.float32)
             self.lm_cls_kps_dict[cls] = kps
         return kps.copy()

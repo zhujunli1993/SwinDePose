@@ -102,14 +102,11 @@ def checkpoint_state(model=None, optimizer=None, best_prec=None, epoch=None, it=
 
 
 def save_checkpoint(
-        state, is_best, filename="checkpoint", bestname="model_best",
-        bestname_pure='ffb6d_best'
+        state,  filename="checkpoint"
 ):
     filename = "{}.pth.tar".format(filename)
     torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, "{}.pth.tar".format(bestname))
-        shutil.copyfile(filename, "{}.pth.tar".format(bestname_pure))
+
 
 
 def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
@@ -168,6 +165,7 @@ def model_fn_decorator(
         model, data, it=0, epoch=0, is_eval=False, is_test=False, finish_test=False,
         test_pose=False
     ):
+        
         if finish_test:
             teval.cal_lm_add(config.cls_id)
             return None
@@ -185,7 +183,7 @@ def model_fn_decorator(
                     cu_dt[key] = data[key].float().cuda()
                 elif data[key].dtype in [torch.int32, torch.int16]:
                     cu_dt[key] = data[key].long().cuda()
-
+            
             end_points = model(cu_dt)
 
             labels = cu_dt['labels']
@@ -272,7 +270,7 @@ def model_fn_decorator(
 
 
 class Trainer(object):
-    r"""
+    """
         Reasonably generic trainer for pytorch models
 
     Parameters
@@ -298,7 +296,6 @@ class Trainer(object):
         model_fn,
         optimizer,
         checkpoint_name="ckpt",
-        best_name="best",
         lr_scheduler=None,
         bnm_scheduler=None,
         viz=None,
@@ -311,20 +308,19 @@ class Trainer(object):
             bnm_scheduler,
         )
 
-        self.checkpoint_name, self.best_name = checkpoint_name, best_name
+        self.checkpoint_name = checkpoint_name
 
         self.training_best, self.eval_best = {}, {}
         self.viz = viz
 
-    def eval_epoch(self, d_loader, is_test=False, test_pose=False, it=0):
+    def eval_epoch(self, d_loader, epoch,  is_test=False, test_pose=False):
         self.model.eval()
 
         eval_dict = {}
         total_loss = 0.0
         count = 1
-        for i, data in tqdm.tqdm(
-            enumerate(d_loader), leave=False, desc="val"
-        ):
+        for _, data in enumerate(d_loader):
+        
             count += 1
             self.optimizer.zero_grad()
 
@@ -359,14 +355,15 @@ class Trainer(object):
             seg_res_fn = 'seg_res'
             for k, v in acc_dict.items():
                 seg_res_fn += '_%s%.2f' % (k, v)
-            with open(os.path.join(config.log_eval_dir, seg_res_fn), 'w') as of:
+            with open(os.path.join(opt.log_eval_dir, seg_res_fn), 'w') as of:
                 for k, v in acc_dict.items():
                     print(k, v, file=of)
         if opt.local_rank == 0:
             print(acc_dict)
-            # writer.add_scalars('val_acc', acc_dict, it)
-            wandb.log({"it": it,
-                        "val_acc": acc_dict})
+            
+            wandb.log({"epoch": epoch,
+                        "val_acc": acc_dict,
+                        "val_loss": total_loss / count})
 
         return total_loss / count, eval_dict
 
@@ -380,10 +377,9 @@ class Trainer(object):
         test_loader=None,
         best_loss=0.0,
         log_epoch_f=None,
-        tot_iter=1,
-        clr_div=6,
+        tot_iter=1
     ):
-        r"""
+        """
            Call to begin training the model
 
         Parameters
@@ -399,107 +395,75 @@ class Trainer(object):
         best_loss : float
             Testing loss of the best model
         """
-
+        
         print("Totally train %d iters per gpu." % tot_iter)
 
-        def is_to_eval(epoch, it):
-            if it == 100:
-                return True, 1
-            wid = tot_iter // clr_div
-            if (it // wid) % 2 == 1:
-                eval_frequency = wid // 15
-            else:
-                eval_frequency = wid // 6
-            to_eval = (it % eval_frequency) == 0
-            return to_eval, eval_frequency
+        # def is_to_eval(epoch, it):
+        #     if it == 100:
+        #         return True, 1
+        #     wid = tot_iter // clr_div
+        #     if (it // wid) % 2 == 1:
+        #         eval_frequency = wid // 15
+        #     else:
+        #         eval_frequency = wid // 6
+        #     to_eval = (it % eval_frequency) == 0
+        #     return to_eval, eval_frequency
+
+        # it = start_it
+        # _, eval_frequency = is_to_eval(0, it)
 
         it = start_it
-        _, eval_frequency = is_to_eval(0, it)
+        for start_epoch in tqdm.tqdm(range(n_epochs)):
+            
+            if train_sampler is not None:
+                train_sampler.set_epoch(start_epoch)
+            # Reset numpy seed.
+            # REF: https://github.com/pytorch/pytorch/issues/5059
+            np.random.seed()
+            if log_epoch_f is not None:
+                os.system("echo {} > {}".format(start_epoch, log_epoch_f))
+            for batch in tqdm.tqdm(train_loader):
+                self.model.train()
 
-        with tqdm.tqdm(range(opt.n_total_epoch), desc="epochs") as tbar, tqdm.tqdm(
-            total=eval_frequency, leave=False, desc="train"
-        ) as pbar:
+                self.optimizer.zero_grad()
+                _, loss, res = self.model_fn(self.model, batch, it=it)
 
-            for epoch in tbar:
-                if epoch > opt.n_total_epoch:
-                    break
-                if train_sampler is not None:
-                    train_sampler.set_epoch(epoch)
-                # Reset numpy seed.
-                # REF: https://github.com/pytorch/pytorch/issues/5059
-                np.random.seed()
-                if log_epoch_f is not None:
-                    os.system("echo {} > {}".format(epoch, log_epoch_f))
-                for batch in train_loader:
-                    self.model.train()
+                with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                    scaled_loss.backward()
 
-                    self.optimizer.zero_grad()
-                    _, loss, res = self.model_fn(self.model, batch, it=it)
+                self.optimizer.step()
 
-                    with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-                        scaled_loss.backward()
-                    lr = get_lr(self.optimizer)
-                    # if args.local_rank == 0:
-                    #     writer.add_scalar('lr/lr', lr, it)
+                if self.lr_scheduler is not None:
+                    self.lr_scheduler.step()
 
-                    self.optimizer.step()
+                if self.bnm_scheduler is not None:
+                    self.bnm_scheduler.step()
 
-                    if self.lr_scheduler is not None:
-                        self.lr_scheduler.step(it)
+                it += 1
+                
+                if self.viz is not None:
+                    self.viz.update("train", it, res)
 
-                    if self.bnm_scheduler is not None:
-                        self.bnm_scheduler.step(it)
+                # eval_flag, eval_frequency = is_to_eval(start_epoch, it)
+                
+            
+            if test_loader is not None:
+                val_loss, res = self.eval_epoch(test_loader, start_epoch)
 
-                    it += 1
+                if val_loss < best_loss:
+                    best_loss = val_loss
+                    if opt.local_rank == 0:
+                        save_checkpoint(
+                            checkpoint_state(
+                                self.model, self.optimizer, val_loss, start_epoch, it
+                            ),
+                            filename=self.checkpoint_name)
 
-                    pbar.update()
-                    pbar.set_postfix(dict(total_it=it))
-                    tbar.refresh()
-
-                    if self.viz is not None:
-                        self.viz.update("train", it, res)
-
-                    eval_flag, eval_frequency = is_to_eval(epoch, it)
-                    if eval_flag:
-                        pbar.close()
-
-                        if test_loader is not None:
-                            val_loss, res = self.eval_epoch(test_loader, it=it)
-                            print("val_loss", val_loss)
-
-                            is_best = val_loss < best_loss
-                            best_loss = min(best_loss, val_loss)
-                            if opt.local_rank == 0:
-                                save_checkpoint(
-                                    checkpoint_state(
-                                        self.model, self.optimizer, val_loss, epoch, it
-                                    ),
-                                    is_best,
-                                    filename=self.checkpoint_name,
-                                    bestname=self.best_name+'_%.4f' % val_loss,
-                                    bestname_pure=self.best_name
-                                )
-                                info_p = self.checkpoint_name.replace(
-                                    '.pth.tar', '_epoch.txt'
-                                )
-                                os.system(
-                                    'echo {} {} >> {}'.format(
-                                        it, val_loss, info_p
-                                    )
-                                )
-
-                        pbar = tqdm.tqdm(
-                            total=eval_frequency, leave=False, desc="train"
-                        )
-                        pbar.set_postfix(dict(total_it=it))
-
-            # if args.local_rank == 0:
-            #     writer.export_scalars_to_json("./all_scalars.json")
-            #     writer.close()
-        return best_loss
+        return val_loss
 
 
 def train():
+    
     
     print("local_rank:", opt.local_rank)
     cudnn.benchmark = True
@@ -569,8 +533,7 @@ def train():
 
     if not opt.eval_net:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[opt.local_rank], output_device=opt.local_rank,
-            find_unused_parameters=True
+            model, device_ids=[opt.local_rank], output_device=opt.local_rank
         )
         clr_div = 6
         lr_scheduler = CyclicLR(
@@ -611,7 +574,6 @@ def train():
         model_fn,
         optimizer,
         checkpoint_name=os.path.join(checkpoint_fd, "FFB6D_%s" % opt.linemod_cls),
-        best_name=os.path.join(checkpoint_fd, "FFB6D_%s_best" % opt.linemod_cls),
         lr_scheduler=lr_scheduler,
         bnm_scheduler=bnm_scheduler,
     )
@@ -627,8 +589,7 @@ def train():
         trainer.train(
             it, start_epoch, opt.n_total_epoch, train_loader, None,
             val_loader, best_loss=best_loss,
-            tot_iter=opt.n_total_epoch * train_ds.minibatch_per_epoch // opt.gpus,
-            clr_div=clr_div
+            tot_iter=opt.n_total_epoch * train_ds.minibatch_per_epoch // opt.gpus
         )
 
         if start_epoch == opt.n_total_epoch:
@@ -643,4 +604,5 @@ if __name__ == "__main__":
                job_type="training",
                name=opt.wandb_name,
                reinit=True)
+    
     train()
