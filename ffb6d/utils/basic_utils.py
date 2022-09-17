@@ -542,7 +542,7 @@ class Basic_Utils():
             return pointxyz
         else:
             ptxyz_pth = os.path.join(
-                'datasets/linemod/Linemod_preprocessed/models',
+                '/workspace/DATA/Linemod_preprocessed/models',
                 'obj_%02d.ply' % cls
             )
             pointxyz = self.ply_vtx(ptxyz_pth) / 1000.0

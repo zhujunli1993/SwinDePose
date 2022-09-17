@@ -3,6 +3,7 @@ import os
 import time
 import torch
 import numpy as np
+import cv2
 import pickle as pkl
 import concurrent.futures
 from config.options import BaseOptions
@@ -225,6 +226,7 @@ def cal_frame_poses_lm(
     Calculates pose parameters by 3D keypoints & center points voting to build
     the 3D-3D corresponding then use least-squares fitting to get the pose parameters.
     """
+    
     n_kps, n_pts, _ = pred_kp_of.size()
     pred_ctr = pcld - ctr_of[0]
     pred_kp = pcld.view(1, n_pts, 3).repeat(n_kps, 1, 1) - pred_kp_of
@@ -256,18 +258,20 @@ def cal_frame_poses_lm(
 
         for ikp, kps3d in enumerate(in_pred_kp):
             cls_kps[cls_id, ikp, :], _ = ms.fit(kps3d)
-
+        
         # visualize
-        if debug:
-            show_kp_img = np.zeros((480, 640, 3), np.uint8)
-            kp_2ds = bs_utils.project_p3d(
-                cls_kps[cls_id].cpu().numpy(), 1000.0, K='linemod'
-            )
-            color = (0, 0, 255)  # bs_utils.get_label_color(cls_id.item())
-            show_kp_img = bs_utils.draw_p2ds(show_kp_img, kp_2ds, r=3, color=color)
-            imshow("kp: cls_id=%d" % cls_id, show_kp_img)
-            waitKey(0)
-
+        # if True:
+            
+        #     show_kp_img = np.zeros((480, 640, 3), np.uint8)
+        #     kp_2ds = bs_utils_lm.project_p3d(
+        #         cls_kps[cls_id].cpu().numpy(), 1000.0, K='linemod'
+        #     )
+        #     color = (0, 0, 255)  # bs_utils.get_label_color(cls_id.item())
+        #     show_kp_img = bs_utils_lm.draw_p2ds(show_kp_img, kp_2ds, r=3, color=color)
+        #     # imshow("kp: cls_id=%d" % cls_id, show_kp_img)
+        #     cv2.imwrite('/workspace/REPO/pose_estimation/ffb6d/train_log/lm_1_pseudo/phone/eval_results/test.png', show_kp_img)
+        #     waitKey(0)
+        
         mesh_kps = bs_utils_lm.get_kps(obj_id, ds_type="linemod")
         if use_ctr:
             mesh_ctr = bs_utils_lm.get_ctr(obj_id, ds_type="linemod").reshape(1, 3)
@@ -282,7 +286,8 @@ def cal_frame_poses_lm(
 
 
 def eval_metric_lm(cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
-    n_cls = config.n_classes
+    
+    n_cls = config_lm.n_classes
     cls_add_dis = [list() for i in range(n_cls)]
     cls_adds_dis = [list() for i in range(n_cls)]
 
@@ -293,8 +298,8 @@ def eval_metric_lm(cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
     add = bs_utils_lm.cal_add_cuda(pred_RT, gt_RT, mesh_pts)
     adds = bs_utils_lm.cal_adds_cuda(pred_RT, gt_RT, mesh_pts)
     # print("obj_id:", obj_id, add, adds)
-    cls_add_dis[obj_id].append(add.item())
-    cls_adds_dis[obj_id].append(adds.item())
+    # cls_add_dis[obj_id].append(add.item())
+    # cls_adds_dis[obj_id].append(adds.item())
     cls_add_dis[0].append(add.item())
     cls_adds_dis[0].append(adds.item())
 
@@ -304,6 +309,7 @@ def eval_metric_lm(cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
 def eval_one_frame_pose_lm(
     item
 ):
+    
     pcld, mask, ctr_of, pred_kp_of, RTs, cls_ids, use_ctr, n_cls, \
         min_cnt, use_ctr_clus_flter, label, epoch, ibs, obj_id = item
     pred_pose_lst = cal_frame_poses_lm(
@@ -323,8 +329,14 @@ def eval_one_frame_pose_lm(
 class TorchEval():
 
     def __init__(self):
-        n_cls = 22
-        self.n_cls = 22
+        
+        if opt.dataset_name=='linemod':
+            n_cls=2
+            self.n_cls=2
+        else:
+            n_cls = 22
+            self.n_cls = 22
+        
         self.cls_add_dis = [list() for i in range(n_cls)]
         self.cls_adds_dis = [list() for i in range(n_cls)]
         self.cls_add_s_dis = [list() for i in range(n_cls)]
@@ -399,7 +411,8 @@ class TorchEval():
         add_auc_lst = []
         adds_auc_lst = []
         add_s_auc_lst = []
-        cls_id = obj_id
+        # cls_id = obj_id
+        cls_id = 0
         if (obj_id) in config_lm.lm_sym_cls_ids:
             self.cls_add_s_dis[cls_id] = self.cls_adds_dis[cls_id]
         else:
@@ -435,7 +448,7 @@ class TorchEval():
         )
         occ = "occlusion" if test_occ else ""
         sv_pth = os.path.join(
-            config_lm.log_eval_dir,
+            opt.log_eval_dir,
             'pvn3d_eval_cuda_{}_{}_{}_{}.pkl'.format(
                 cls_type, occ, add, adds
             )
@@ -448,6 +461,7 @@ class TorchEval():
         use_ctr_clus_flter=True, use_ctr=True, obj_id=0, kp_type='farthest',
         ds='ycb'
     ):
+        
         bs, n_kps, n_pts, c = pred_kp_ofs.size()
         masks = masks.long()
         cls_ids = cls_ids.long()
@@ -474,6 +488,7 @@ class TorchEval():
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=bs
         ) as executor:
+        
             if ds == "ycb":
                 eval_func = eval_one_frame_pose
             else:
@@ -489,6 +504,7 @@ class TorchEval():
                     )
                 else:
                     cls_add_dis_lst, cls_adds_dis_lst = res
+                
                 self.cls_add_dis = self.merge_lst(
                     self.cls_add_dis, cls_add_dis_lst
                 )
@@ -497,6 +513,7 @@ class TorchEval():
                 )
 
     def merge_lst(self, targ, src):
+        
         for i in range(len(targ)):
             targ[i] += src[i]
         return targ

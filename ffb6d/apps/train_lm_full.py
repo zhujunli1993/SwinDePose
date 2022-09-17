@@ -110,7 +110,7 @@ def save_checkpoint(
 
 
 def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
-    filename = "{}.pth.tar".format(filename)
+    
 
     if os.path.isfile(filename):
         print("==> Loading from checkpoint '{}'".format(filename))
@@ -238,7 +238,7 @@ def model_fn_decorator(
                             "train_acc": acc_dict})
             if is_test and test_pose:
                 cld = cu_dt['cld_rgb_nrm'][:, :3, :].permute(0, 2, 1).contiguous()
-
+                
                 if not opt.test_gt:
                     # eval pose from point cloud prediction.
                     teval.eval_pose_parallel(
@@ -345,7 +345,7 @@ class Trainer(object):
                 acc_dict[k] = v
         for k, v in mean_eval_dict.items():
             print(k, v)
-
+        
         if is_test:
             if test_pose:
                 self.model_fn(
@@ -523,6 +523,7 @@ def train():
 
     # load status from checkpoint
     if opt.load_checkpoint is not None:
+        
         checkpoint_status = load_checkpoint(
             model, optimizer, filename=opt.load_checkpoint
         )
@@ -559,7 +560,7 @@ def train():
     if opt.eval_net:
         model_fn = model_fn_decorator(
             FocalLoss(gamma=2), OFLoss(),
-            opt.test,
+            opt.test, 
         )
     else:
         model_fn = model_fn_decorator(
@@ -581,7 +582,7 @@ def train():
     if opt.eval_net:
         start = time.time()
         val_loss, res = trainer.eval_epoch(
-            test_loader, is_test=True, test_pose=opt.test_pose
+            test_loader, opt.n_total_epoch, is_test=True, test_pose=opt.test_pose
         )
         end = time.time()
         print("\nUse time: ", end - start, 's')
