@@ -23,6 +23,9 @@ class BaseOptions():
         g_data.add_argument('--angles_gen', type=str,  help='The C++ codes directory for generating XYZ angles and signed angles file.')
         g_data.add_argument('--train_list', type=str,  help='training list.')
         g_data.add_argument('--test_list', type=str,  help='testing list.')
+        g_data.add_argument('--lm_no_fuse', action='store_true', help='Not including fuse/ data when training as data augmentation.')
+        g_data.add_argument('--lm_no_render', action='store_true', help='Not including render/ data when training as data augmentation.')
+        
         # Experiment related
         g_exp = parser.add_argument_group('Experiment')
         g_exp.add_argument('--exp_dir', type=str, default='/workspace/REPO/pose_estimation', help='code directory')

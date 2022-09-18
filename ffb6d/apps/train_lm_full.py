@@ -40,6 +40,8 @@ from apex.parallel import DistributedDataParallel
 from apex.parallel import convert_syncbn_model
 from apex import amp
 
+
+    
 # get options
 opt = BaseOptions().parse()
 
@@ -364,7 +366,8 @@ class Trainer(object):
             wandb.log({"epoch": epoch,
                         "val_acc": acc_dict,
                         "val_loss": total_loss / count})
-
+            
+            
         return total_loss / count, eval_dict
 
     def train(
@@ -411,7 +414,11 @@ class Trainer(object):
 
         # it = start_it
         # _, eval_frequency = is_to_eval(0, it)
-
+        
+        # Early stopping
+        last_loss = 1e10
+        patience = 7
+        trigger_times = 0
         it = start_it
         for start_epoch in tqdm.tqdm(range(n_epochs)):
             
@@ -458,7 +465,17 @@ class Trainer(object):
                                 self.model, self.optimizer, val_loss, start_epoch, it
                             ),
                             filename=self.checkpoint_name)
-
+                # Early Stopping
+                current_loss = val_loss
+                if current_loss > last_loss:
+                    trigger_times += 1
+                    if trigger_times >= patience:
+                        print('Early Stopping!\n')
+                        exit()
+                else:
+                    trigger_times = 0
+                last_loss = current_loss
+        
         return val_loss
 
 

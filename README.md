@@ -1,7 +1,12 @@
 # Pseudo-RGB FFB6D. 
 
 ## This is an implementation of FFB6D, with pseudo-RGB images as input.
-### To preview the MD file, press ctrl+k+v
+To preview the MD file, press ctrl+k+v
+
+### Run our FFB6D docker 
+```bash 
+sudo nvidia-docker run --gpus all --ipc=host --ulimit memlock=-1 --name 'new container name' -it --rm -v /raid/home/zl755:/workspace zhujunli/ffb6d:latest
+```
 ### Generate Pseudo Images
 It will generate both XYZ pseudo and signed angles pseudo images. 
 ```bash 

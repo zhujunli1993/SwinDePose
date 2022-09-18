@@ -87,6 +87,8 @@ class Config:
             self.render_path = os.path.join(self.lm_root, 'renders/%s/*.pkl' % cls_type)
             self.fuse_path = os.path.join(self.lm_root, 'fuse/%s/*.pkl' % cls_type)
             self.test_path = os.path.join(self.cls_root, opt.test_list)
+            self.render_files = os.path.join(self.lm_root, 'renders/%s/file_list.txt' % cls_type)
+            self.fuse_files = os.path.join(self.lm_root, 'fuse/%s/file_list.txt' % cls_type)
             
             self.use_orbfps = True
             self.kp_orbfps_dir = os.path.join(self.lm_root, 'kps_orb9_fps')
