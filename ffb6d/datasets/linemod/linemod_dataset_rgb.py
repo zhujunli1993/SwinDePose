@@ -50,10 +50,13 @@ class Dataset():
             real_img_pth = self.config.train_path
             self.real_lst = self.bs_utils.read_lines(real_img_pth)
             
-            # rnd_img_ptn = self.config.render_path
-            # self.rnd_lst = glob(rnd_img_ptn)
+            if not self.opt.lm_no_render:
+                self.rnd_lst = self.bs_utils.read_lines(self.config.render_files)
+                # rnd_img_ptn = self.config.render_path
+                # self.rnd_lst = glob(rnd_img_ptn)
             # Remove render images
-            self.rnd_lst=[]
+            else:
+                self.rnd_lst=[]
             
             print("render data length: ", len(self.rnd_lst))
             if len(self.rnd_lst) == 0:
@@ -61,11 +64,14 @@ class Dataset():
                 warning += "Trainnig without rendered data will hurt model performance \n"
                 warning += "Please generate rendered data from https://github.com/ethnhe/raster_triangle.\n"
                 print(warning)
-
-            # fuse_img_ptn = self.config.fuse_path
-            # self.fuse_lst = glob(fuse_img_ptn)
+            
+            if not self.opt.lm_no_fuse:
+                self.fuse_lst = self.bs_utils.read_lines(self.config.fuse_files)
+                # fuse_img_ptn = self.config.fuse_path
+                # self.fuse_lst = glob(fuse_img_ptn)
             # Remove fuse images
-            self.fuse_lst=[]
+            else:
+                self.fuse_lst=[]
             print("fused data length: ", len(self.fuse_lst))
             if len(self.fuse_lst) == 0:
                 warning = "Warning: "
@@ -171,12 +177,12 @@ class Dataset():
         with Image.open(os.path.join(self.cls_root, "mask", real_item+'.png')) as li:
             bk_label = np.array(li)
         bk_label = (bk_label < 255).astype(rgb.dtype)
-        bk_label_3c = np.repeat(bk_label[:, :, None], 3, 2)
+        # bk_label_3c = np.repeat(bk_label[:, :, None], 3, 2)
         if len(bk_label.shape) > 2:
             bk_label = bk_label[:, :, 0]
         with Image.open(os.path.join(self.cls_root, "rgb", real_item+'.png')) as ri:
-            # back = np.array(ri)[:, :, :3] * bk_label[:, :, None]
-            back = np.array(ri)[:, :, :3] * bk_label_3c
+            back = np.array(ri)[:, :, :3] * bk_label[:, :, None]
+            # back = np.array(ri)[:, :, :3] * bk_label_3c
         
         dpt_back = real_dpt.astype(np.float32) * bk_label.astype(np.float32)
 
