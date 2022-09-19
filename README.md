@@ -7,6 +7,10 @@ To preview the MD file, press ctrl+k+v
 ```bash 
 sudo nvidia-docker run --gpus all --ipc=host --ulimit memlock=-1 --name 'new container name' -it --rm -v /raid/home/zl755:/workspace zhujunli/ffb6d:latest
 ```
+or 
+```bash 
+sudo sudo docker exec -it ffb6d /bin/bash
+```
 ### Generate Pseudo Images
 It will generate both XYZ pseudo and signed angles pseudo images. 
 ```bash 

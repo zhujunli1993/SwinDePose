@@ -229,7 +229,7 @@ class FFB6D(nn.Module):
 
         # rndla pre
         # xyz, p_emb = self._break_up_pc(inputs['cld_rgb_nrm'])
-        p_emb = inputs['cld_rgb_nrm']
+        p_emb = inputs['cld_rgb_nrm'] # cld, rgb_c_pt, nrm_pt: selected points
         p_emb = self.rndla_pre_stages(p_emb)
         p_emb = p_emb.unsqueeze(dim=3)  # Batch*channel*npoints*1
 

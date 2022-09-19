@@ -1,0 +1,17 @@
+****/*.tar
+****/*.pkl
+__pycache__
+*/__pycache__
+*/*/__pycache__
+*/*/*/__pycache__
+*/*/*/*/__pycache__
+*****.pyc
+****/*.so
+apex/
+normalSpeed/
+ffb6d/train_log/
+ffb6d/wandb/
+ffb6d/*/*/__pycache__
+ffb6d/*/*/*/__pycache__
+ffb6d/*/__pycache__
+*.pyc

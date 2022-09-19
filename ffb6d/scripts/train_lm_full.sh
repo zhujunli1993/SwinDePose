@@ -11,7 +11,7 @@ SAVE_CHECKPOINT="$EXP_DIR/$NAME/$CLS/checkpoints"
 LOG_TRAININFO_DIR="$EXP_DIR/$NAME/$CLS/train_info"
 # checkpoint to resume. 
 #tst_mdl="train_log/linemod_half_pseang_1/checkpoints/${cls}/FFB6D_${cls}_best.pth.tar"
-python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT apps/train_lm_full.py \
+python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 50000 apps/train_lm_full.py \
     --gpus=$GPU_COUNT \
     --wandb_proj $WANDB_PROJ \
     --wandb_name $NAME \
