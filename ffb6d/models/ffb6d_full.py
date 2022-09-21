@@ -224,7 +224,7 @@ class FFB6D(nn.Module):
         # angles_emb = self.cnn_pre_stages(inputs['angles']) # stride = 2, [bs, c, 240, 320]
         # sign_angles_emb = self.cnn_pre_stages(inputs['sign_angles']) # stride = 2, [bs, c, 240, 320]
         # rgb_emb = angles_emb + sign_angles_emb
-        import pdb; pdb.set_trace()
+        
         rgb_emb = self.cnn_pre_stages(inputs['rgb'])  
 
         # rndla pre
