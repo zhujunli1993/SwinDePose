@@ -127,12 +127,21 @@ class ResNet(nn.Module):
         self.inplanes = 64
         self.fully_conv = fully_conv
         super(ResNet, self).__init__()
-        if opt.full==True:
+        if opt.full:
             self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+        elif opt.add_depth and not opt.depth_split:
+            self.conv1 = nn.Conv2d(7, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+        elif opt.add_depth and opt.depth_split:
+            self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+            self.conv1_depth = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
         else:
             self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
+            
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -187,7 +196,11 @@ class ResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.conv1(x)
+        
+        if opt.depth_split:
+            x = self.conv1_depth(x)
+        else:
+            x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.maxpool(x)

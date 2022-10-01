@@ -3,7 +3,7 @@ GPU_NUM=4
 GPU_COUNT=1
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
 CLS='phone'
-NAME='lm_2_pseudo'
+NAME='lm_pseudo_noSyn'
 
 EXP_DIR='/workspace/REPO/pose_estimation/ffb6d/train_log'
 LOG_EVAL_DIR="$EXP_DIR/$NAME/$CLS/eval_results"
@@ -15,7 +15,7 @@ python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 400
     --num_threads 0 \
     --dataset_name 'linemod' \
     --data_root '/workspace/DATA/Linemod_preprocessed' \
-    --train_list 'train.txt' --test_list 'test_.txt' \
+    --train_list 'train.txt' --test_list 'test.txt' \
     --linemod_cls=$CLS --full \
     --load_checkpoint $tst_mdl \
     --test --test_pose --eval_net \

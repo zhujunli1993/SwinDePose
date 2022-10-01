@@ -1,7 +1,7 @@
 #!/bin/bash
 GPU_NUM=7
 GPU_COUNT=1
-NAME='lm_vtesting'
+NAME='lm_pseudo_halfSyn'
 WANDB_PROJ='pose_estimation'
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
 CLS='phone'
