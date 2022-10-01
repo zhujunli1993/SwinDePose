@@ -35,7 +35,7 @@ from models.loss import OFLoss, FocalLoss
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
 import datasets.linemod.linemod_dataset_rgb as dataset_desc
-
+import datasets.linemod.linemod_dataset_onlyDepth as dataset_desc_depth
 from apex.parallel import DistributedDataParallel
 from apex.parallel import convert_syncbn_model
 from apex import amp
@@ -494,7 +494,10 @@ def train():
     )
 
     if not opt.eval_net:
-        train_ds = dataset_desc.Dataset('train', cls_type=opt.linemod_cls)
+        if opt.depth_only:
+            train_ds = dataset_desc_depth.Dataset('train', cls_type=opt.linemod_cls)
+        else:
+            train_ds = dataset_desc.Dataset('train', cls_type=opt.linemod_cls)
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_ds)
         train_loader = torch.utils.data.DataLoader(
             train_ds, batch_size=opt.mini_batch_size, shuffle=False,

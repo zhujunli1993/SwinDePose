@@ -43,6 +43,10 @@ class BaseOptions():
         g_exp.add_argument('--deterministic', action='store_true')
         g_exp.add_argument('--keep_batchnorm_fp32', default=True)
         g_exp.add_argument('--opt_level', default="O0", type=str,help='opt level of apex mix presision trainig.')
+        g_exp.add_argument('--depth_only', action='store_true', help='if true, replace pseudo to pure depth image')
+        g_exp.add_argument('--add_depth', action='store_true', help='if true, add depth to input')
+        g_exp.add_argument('--depth_split', action='store_true', help='if true, add depth to input and consider depth channel as a seperate info')
+        
         
         # Training related
         g_train = parser.add_argument_group('Training')

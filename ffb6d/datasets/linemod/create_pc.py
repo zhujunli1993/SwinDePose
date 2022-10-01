@@ -31,6 +31,80 @@ def dpt_2_pcld(dpt, cam_scale, K):
 K = np.array([[572.4114, 0.,         325.2611],
                 [0.,        573.57043,  242.04899],
                 [0.,        0.,         1.]])
+item ='/workspace/DATA/Linemod_preprocessed/renders/phone/0.pkl'
+cam_scale = 1000.0
+data = pkl.load(open(item, "rb"))
+
+dpt_mm = data['depth'] * cam_scale
+K = data['K']
+h, w = dpt_mm.shape 
+
+dpt_m = dpt_mm.astype(np.float32) / cam_scale
+dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
+dpt_xyz[np.isnan(dpt_xyz)] = 0.0
+dpt_xyz[np.isinf(dpt_xyz)] = 0.0
+
+xyz_lst = [dpt_xyz.transpose(2, 0, 1)] # c, h, w
+msk_lst = [dpt_xyz[2, :, :] > 1e-8]
+
+dpt_xyz = np.reshape(dpt_xyz,(480*640, 3))
+
+new_col = 0.5000*np.ones([480*640,1])
+dpt_xyz = np.append(dpt_xyz, new_col, 1)
+
+dpt_xyz = torch.from_numpy(dpt_xyz)
+
+#pcd format preparation
+xCenter = (torch.max(dpt_xyz[:,0]) + torch.min(dpt_xyz[:,0])) / 2.0000
+yCenter = (torch.max(dpt_xyz[:,1]) + torch.min(dpt_xyz[:,1])) / 2.0000
+zCenter = (torch.max(dpt_xyz[:,2]) + torch.min(dpt_xyz[:,2])) / 2.0000
+image_center = np.asarray([xCenter, yCenter, zCenter])
+image_center = np.reshape(image_center, (1,3))
+
+# partial_path = os.path.join(root, cls_id, str(idx)+'.ptx') 
+partial_path = 'test1.ptx'
+row_col = np.asarray([h,w])
+row_col = np.reshape(row_col, (2,1))
+matrix1 = np.eye(3, dtype=int)
+matrix2 = np.eye(4, dtype=int)
+with open(partial_path, 'wb') as f:
+    np.savetxt(f, row_col , fmt='%i', delimiter=' ')
+    np.savetxt(f, image_center, fmt='%.4f', delimiter=' ')
+    np.savetxt(f, matrix1, fmt='%i', delimiter=' ')
+    np.savetxt(f, matrix2, fmt='%i', delimiter=' ')
+    np.savetxt(f, dpt_xyz, fmt = '%.4f', delimiter=' ')
+    
+path_root = "/workspace/ClassificationProject-master/Applications/ComputeSignedAnglesFromPtxFile/"
+code = path_root + "compute_signed_angles_from_ptx_file"   
+os.system(code+" "+partial_path+">out.txt")
+
+angles = render_mulimage_angles_pkl(os.path.join(root, cls_id, 'pseudo_angles'), str(idx))
+signed = render_mulimage_signed_pkl(os.path.join(root, cls_id, 'pseudo_signed'), str(idx))
+
+# if os.path.isfile(partial_path):
+#     os.system("rm " + partial_path)
+
+# rgb = data['rgb']
+# mask = data['mask']
+
+# idx_bg = (mask==0)
+# idx_obj = (mask!=0)
+
+# angles_new = np.zeros([rgb.shape[0], rgb.shape[1], 3])
+# signed_new = np.zeros([rgb.shape[0], rgb.shape[1], 3])
+
+# for i in range(3):
+#     angles_new[idx_bg,i] = rgb[idx_bg,i]
+#     angles_new[idx_obj,i] = angles[idx_obj,i]
+#     signed_new[idx_bg,i] = rgb[idx_bg,i]
+#     signed_new[idx_obj,i] = signed[idx_obj,i]
+
+# data['angles'] = angles_new 
+# data['signed'] = signed_new  
+
+# with open(os.path.join(root, cls_id, item),"wb") as f:
+#     pkl.dump(data, f)
+
 '''root = 'Linemod_preprocessed/data'
 scenes_data = os.listdir(root)
 
@@ -97,83 +171,83 @@ for scene in scenes_data:
     
 print('Done Train Dataset!!')
 '''
-root = 'Linemod_preprocessed/renders' #0:15000; 15000:-1 not complete
-cls_data = os.listdir(root)
-for cls_id in cls_data:    
-    file_list = np.loadtxt(os.path.join(root, cls_id, 'file_list.txt'),dtype=str)
-    cam_scale = 1000.0
-    for item in file_list:
-        idx = item.split('/')[-1].split('.')[0]
-        data = pkl.load(open(item, "rb"))
+# root = 'Linemod_preprocessed/renders' #0:15000; 15000:-1 not complete
+# cls_data = os.listdir(root)
+# for cls_id in cls_data:    
+#     file_list = np.loadtxt(os.path.join(root, cls_id, 'file_list.txt'),dtype=str)
+#     cam_scale = 1000.0
+#     for item in file_list:
+#         idx = item.split('/')[-1].split('.')[0]
+#         data = pkl.load(open(item, "rb"))
 
-        dpt_mm = data['depth'] * cam_scale
-        K = data['K']
-        h, w = dpt_mm.shape 
-        dpt_m = dpt_mm.astype(np.float32) / cam_scale
-        dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
-        dpt_xyz[np.isnan(dpt_xyz)] = 0.0
-        dpt_xyz[np.isinf(dpt_xyz)] = 0.0
+#         dpt_mm = data['depth'] * cam_scale
+#         K = data['K']
+#         h, w = dpt_mm.shape 
+#         dpt_m = dpt_mm.astype(np.float32) / cam_scale
+#         dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
+#         dpt_xyz[np.isnan(dpt_xyz)] = 0.0
+#         dpt_xyz[np.isinf(dpt_xyz)] = 0.0
 
-        xyz_lst = [dpt_xyz.transpose(2, 0, 1)] # c, h, w
-        msk_lst = [dpt_xyz[2, :, :] > 1e-8]
+#         xyz_lst = [dpt_xyz.transpose(2, 0, 1)] # c, h, w
+#         msk_lst = [dpt_xyz[2, :, :] > 1e-8]
 
-        dpt_xyz = np.reshape(dpt_xyz,(480*640, 3))
+#         dpt_xyz = np.reshape(dpt_xyz,(480*640, 3))
 
-        new_col = 0.5000*np.ones([480*640,1])
-        dpt_xyz = np.append(dpt_xyz, new_col, 1)
+#         new_col = 0.5000*np.ones([480*640,1])
+#         dpt_xyz = np.append(dpt_xyz, new_col, 1)
 
-        dpt_xyz = torch.from_numpy(dpt_xyz)
+#         dpt_xyz = torch.from_numpy(dpt_xyz)
 
-        #pcd format preparation
-        xCenter = (torch.max(dpt_xyz[:,0]) + torch.min(dpt_xyz[:,0])) / 2.0000
-        yCenter = (torch.max(dpt_xyz[:,1]) + torch.min(dpt_xyz[:,1])) / 2.0000
-        zCenter = (torch.max(dpt_xyz[:,2]) + torch.min(dpt_xyz[:,2])) / 2.0000
-        image_center = np.asarray([xCenter, yCenter, zCenter])
-        image_center = np.reshape(image_center, (1,3))
+#         #pcd format preparation
+#         xCenter = (torch.max(dpt_xyz[:,0]) + torch.min(dpt_xyz[:,0])) / 2.0000
+#         yCenter = (torch.max(dpt_xyz[:,1]) + torch.min(dpt_xyz[:,1])) / 2.0000
+#         zCenter = (torch.max(dpt_xyz[:,2]) + torch.min(dpt_xyz[:,2])) / 2.0000
+#         image_center = np.asarray([xCenter, yCenter, zCenter])
+#         image_center = np.reshape(image_center, (1,3))
 
-        partial_path = os.path.join(root, cls_id, str(idx)+'.ptx') 
+#         partial_path = os.path.join(root, cls_id, str(idx)+'.ptx') 
         
-        row_col = np.asarray([h,w])
-        row_col = np.reshape(row_col, (2,1))
-        matrix1 = np.eye(3, dtype=int)
-        matrix2 = np.eye(4, dtype=int)
-        with open(partial_path, 'wb') as f:
-            np.savetxt(f, row_col , fmt='%i', delimiter=' ')
-            np.savetxt(f, image_center, fmt='%.4f', delimiter=' ')
-            np.savetxt(f, matrix1, fmt='%i', delimiter=' ')
-            np.savetxt(f, matrix2, fmt='%i', delimiter=' ')
-            np.savetxt(f, dpt_xyz, fmt = '%.4f', delimiter=' ')
-        path_root = "../../ClassificationProject-master/Applications/ComputeSignedAnglesFromPtxFile/"
-        code = path_root + "compute_signed_angles_from_ptx_file"   
-        os.system(code+" "+partial_path)
+#         row_col = np.asarray([h,w])
+#         row_col = np.reshape(row_col, (2,1))
+#         matrix1 = np.eye(3, dtype=int)
+#         matrix2 = np.eye(4, dtype=int)
+#         with open(partial_path, 'wb') as f:
+#             np.savetxt(f, row_col , fmt='%i', delimiter=' ')
+#             np.savetxt(f, image_center, fmt='%.4f', delimiter=' ')
+#             np.savetxt(f, matrix1, fmt='%i', delimiter=' ')
+#             np.savetxt(f, matrix2, fmt='%i', delimiter=' ')
+#             np.savetxt(f, dpt_xyz, fmt = '%.4f', delimiter=' ')
+#         path_root = "../../ClassificationProject-master/Applications/ComputeSignedAnglesFromPtxFile/"
+#         code = path_root + "compute_signed_angles_from_ptx_file"   
+#         os.system(code+" "+partial_path)
         
-        angles = render_mulimage_angles_pkl(os.path.join(root, cls_id, 'pseudo_angles'), str(idx))
-        signed = render_mulimage_signed_pkl(os.path.join(root, cls_id, 'pseudo_signed'), str(idx))
+#         angles = render_mulimage_angles_pkl(os.path.join(root, cls_id, 'pseudo_angles'), str(idx))
+#         signed = render_mulimage_signed_pkl(os.path.join(root, cls_id, 'pseudo_signed'), str(idx))
 
-        if os.path.isfile(partial_path):
-            os.system("rm " + partial_path)
+#         if os.path.isfile(partial_path):
+#             os.system("rm " + partial_path)
         
-        rgb = data['rgb']
-        mask = data['mask']
+#         rgb = data['rgb']
+#         mask = data['mask']
         
-        idx_bg = (mask==0)
-        idx_obj = (mask!=0)
+#         idx_bg = (mask==0)
+#         idx_obj = (mask!=0)
 
-        angles_new = np.zeros([rgb.shape[0], rgb.shape[1], 3])
-        signed_new = np.zeros([rgb.shape[0], rgb.shape[1], 3])
+#         angles_new = np.zeros([rgb.shape[0], rgb.shape[1], 3])
+#         signed_new = np.zeros([rgb.shape[0], rgb.shape[1], 3])
         
-        for i in range(3):
-            angles_new[idx_bg,i] = rgb[idx_bg,i]
-            angles_new[idx_obj,i] = angles[idx_obj,i]
-            signed_new[idx_bg,i] = rgb[idx_bg,i]
-            signed_new[idx_obj,i] = signed[idx_obj,i]
+#         for i in range(3):
+#             angles_new[idx_bg,i] = rgb[idx_bg,i]
+#             angles_new[idx_obj,i] = angles[idx_obj,i]
+#             signed_new[idx_bg,i] = rgb[idx_bg,i]
+#             signed_new[idx_obj,i] = signed[idx_obj,i]
         
-        data['angles'] = angles_new 
-        data['signed'] = signed_new  
+#         data['angles'] = angles_new 
+#         data['signed'] = signed_new  
         
-        with open(os.path.join(root, cls_id, item),"wb") as f:
-            pkl.dump(data, f)
-print('Done Test Dataset!!')   
+#         with open(os.path.join(root, cls_id, item),"wb") as f:
+#             pkl.dump(data, f)
+# print('Done Test Dataset!!')   
 '''item = '/workspace/raster_triangle/Linemod_preprocessed/renders/phone/0.pkl'
 data = pkl.load(open(item, "rb"))
 cv2.imwrite('/workspace/raster_triangle/Linemod_preprocessed/renders/phone/0_r.png', data['rgb'])
