@@ -44,9 +44,11 @@ class BaseOptions():
         g_exp.add_argument('--keep_batchnorm_fp32', default=True)
         g_exp.add_argument('--opt_level', default="O0", type=str,help='opt level of apex mix presision trainig.')
         g_exp.add_argument('--depth_only', action='store_true', help='if true, replace pseudo to pure depth image')
+        g_exp.add_argument('--rgb_only', action='store_true', help='if true, replace pseudo to regualr RGB image.')
+        g_exp.add_argument('--pseudo_only', action='store_true', help='if true, replace regular RGB image to pseudo.')
         g_exp.add_argument('--add_depth', action='store_true', help='if true, add depth to input')
         g_exp.add_argument('--depth_split', action='store_true', help='if true, add depth to input and consider depth channel as a seperate info')
-        
+        g_exp.add_argument('--attention', action='store_true', help='if true, use self-attention module to fuse the pseudo and depth emb.')
         
         # Training related
         g_train = parser.add_argument_group('Training')
@@ -94,7 +96,6 @@ class BaseOptions():
         
         # General
         g_model.add_argument('--resnet_ptr_mdl_p', type=str, default='/workspace/pose-estimation-dls1/ffb6d/models/cnn/ResNet_pretrained_mdl', help='ResNet pretrained model path.')
-        g_model.add_argument('--full', action='store_true', help='using both angles and signed angles.')
         # RandLA
         g_model.add_argument('--k_n', type=int, default=16, help='KNN')
         g_model.add_argument('--num_layers', type=int, default=4, help='Number of layers')
@@ -105,11 +106,19 @@ class BaseOptions():
         g_model.add_argument('--val_batch_size', type=int, default=3, help='batch_size during validation and test')
         g_model.add_argument('--train_steps', type=int, default=500, help='Number of steps per epochs')
         g_model.add_argument('--val_steps', type=int, default=100, help='Number of validation steps per epoch')
-        g_model.add_argument('--in_c', type=int, default=12, help='Number of validation steps per epoch')
         g_model.add_argument('--sub_sampling_ratio', nargs='+', default=[4,4,4,4], type=int, help='sampling ratio of random sampling at each layer')
         g_model.add_argument('--d_out', nargs='+', default=[32, 64, 128, 256], type=int, help='feature dimension')
         # g_model.add_argument('--num_sub_points', nargs='+', default=[480 * 640 // 24 // 4, 480 * 640 // 24 // 16, 480 * 640 // 24 // 64, 480 * 640 // 24 // 256],  
         #                      help='num_points // 4, num_points // 16, num_points // 64, num_points // 256')        
+        g_model.add_argument('--psp_out', default=512, type=int, help='last layer dim of psp downsampling.')
+        g_model.add_argument('--psp_size', default=256, type=int, help='psp size for psp layer initial, maybe equal to the last second emb_length of ds_rgb_oc.')
+        g_model.add_argument('--ds_depth_oc',nargs='+', default=[64, 128, 256, 512], type=int, help='depth image emb length for downsampling.')
+        g_model.add_argument('--ds_rgb_oc',nargs='+', default=[64, 128, 256, 512], type=int, help='pseudo image emb length.')
+        g_model.add_argument('--ds_depth_oc_fuse',nargs='+', default=[128, 256, 512, 512], type=int, help='depth and pseudo fused emb length.')
+        g_model.add_argument('--up_depth_oc',nargs='+', default=[512, 256, 64, 64], type=int, help='depth image emb length for upsampling.')
+        g_model.add_argument('--up_rgb_oc',nargs='+', default=[256, 64, 64], type=int, help='pseudo image emb length for upsampling.')
+        
+        
         
         # aug
         # group_aug = parser.add_argument_group('aug')

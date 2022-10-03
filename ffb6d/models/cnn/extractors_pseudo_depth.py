@@ -6,12 +6,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
 from config.options import BaseOptions
-from config.common import Config
+
 opt = BaseOptions().parse()
-if opt.dataset_name=='ycb':
-    config = Config(ds_name='ycb')
-else:   
-    config = Config(ds_name=opt.dataset_name, cls_type=opt.linemod_cls)
+
 
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
@@ -127,29 +124,26 @@ class ResNet(nn.Module):
         self.inplanes = 64
         self.fully_conv = fully_conv
         super(ResNet, self).__init__()
-        if opt.full:
-            self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-        elif opt.add_depth and not opt.depth_split:
+        
+        
+        if not opt.depth_split:
             self.conv1 = nn.Conv2d(7, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
-        elif opt.add_depth and opt.depth_split:
+        else:
             self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
             self.conv1_depth = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
-        else:
-            self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
+        
             
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
-        self.layer1 = self._make_layer(block, 64, layers[0])
-        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
-        self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4)
+        self.layer1 = self._make_layer(block, opt.ds_rgb_oc[0], layers[0])
+        self.layer2 = self._make_layer(block, opt.ds_rgb_oc[1], layers[1], stride=2)
+        self.layer3 = self._make_layer(block, opt.ds_rgb_oc[2], layers[2], stride=1, dilation=2)
+        self.layer4 = self._make_layer(block, opt.ds_rgb_oc[3], layers[3], stride=1, dilation=4)
 
         self.avgpool = nn.AvgPool2d(7)
 

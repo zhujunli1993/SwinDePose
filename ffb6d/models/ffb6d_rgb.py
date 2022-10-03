@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.cnn.pspnet import PSPNet
+from models.cnn.pspnet_rgb import PSPNet
 import models.pytorch_utils as pt_utils
 from models.RandLA.RandLANet import Network as RandLANet
 
@@ -207,8 +207,6 @@ class FFB6D(nn.Module):
         Params:
         inputs: dict of :
             rgb         : FloatTensor [bs, 3, h, w]
-            # angles      : FloatTensor [bs, 3, h, w]
-            # sign_angles : FloatTensor [bs, 3, h, w]
             dpt_nrm     : FloatTensor [bs, 6, h, w], 3c xyz in meter + 3c normal map
             cld_rgb_nrm : FloatTensor [bs, 9, npts]
             choose      : LongTensor [bs, 1, npts]

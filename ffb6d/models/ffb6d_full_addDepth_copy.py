@@ -1,18 +1,18 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.cnn.pspnet import PSPNet
+from models.cnn.pspnet_pseudoOnly import PSPNet
 import models.pytorch_utils as pt_utils
 from models.RandLA.RandLANet import Network as RandLANet
 
 
 psp_models = {
     'resnet18': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='resnet18'),
-    'resnet34': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='resnet34'),
+    'resnet34': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=256, deep_features_size=128, backend='resnet34'),
     'resnet50': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet50'),
 }
 
-# First fuse rgb with depth to get fused_rgb, then fuse the fused_rgb with point cloud.
+
 class FFB6D(nn.Module):
     def __init__(
         self, n_classes, n_pts, rndla_cfg, n_kps=8
@@ -44,7 +44,8 @@ class FFB6D(nn.Module):
             cnn.feats.layer1,    # stride = 1, [bs, 64, 120, 160]
             cnn.feats.layer2,    # stride = 2, [bs, 128, 60, 80]
             # stride = 1, [bs, 128, 60, 80]
-            nn.Sequential(cnn.feats.layer3, cnn.feats.layer4),
+            # nn.Sequential(cnn.feats.layer3, cnn.feats.layer4),
+            cnn.feats.layer3,
             nn.Sequential(cnn.psp, cnn.drop_1)   # [bs, 1024, 60, 80]
         ])
         self.ds_depth_oc = [64, 128, 256, 512]
@@ -74,7 +75,7 @@ class FFB6D(nn.Module):
 
         self.rndla_ds_stages = rndla.dilated_res_blocks
 
-        self.ds_rgb_oc = [64, 128, 512, 1024]
+        self.ds_rgb_oc = [64, 128, 256, 512]
         self.ds_rndla_oc = [item * 2 for item in rndla_cfg.d_out]
         self.ds_fuse_r2p_pre_layers = nn.ModuleList()
         self.ds_fuse_r2p_fuse_layers = nn.ModuleList()
@@ -82,9 +83,10 @@ class FFB6D(nn.Module):
         self.ds_fuse_p2r_fuse_layers = nn.ModuleList()
         # # Fuse the depth channel with the rgb features.
         self.ds_fuse_fd_fuse_layers = nn.ModuleList()
+        # self.ds_fuse_dp_fuse_layers = nn.ModuleList()
         # self.ds_fuse_d2f_pre_layers = nn.ModuleList()
         # self.ds_fuse_d2f_fuse_layers = nn.ModuleList()
-        self.ds_depth_oc_fuse = [128, 256, 512,512]
+        self.ds_depth_oc_fuse = [128, 256, 512, 512]
         for i in range(4):
             
             self.ds_fuse_fd_fuse_layers.append(
@@ -93,7 +95,7 @@ class FFB6D(nn.Module):
                     bn=True
                 )
             )
-
+            
             self.ds_fuse_r2p_pre_layers.append(
                 pt_utils.Conv2d(
                     self.ds_rgb_oc[i], self.ds_rndla_oc[i], kernel_size=(1, 1),
@@ -119,6 +121,12 @@ class FFB6D(nn.Module):
                     bn=True
                 )
             )
+            # self.ds_fuse_dp_fuse_layers.append(
+            #     pt_utils.Conv2d(
+            #         self.ds_rndla_oc[i]+self.ds_depth_oc_fuse[i], self.ds_rndla_oc[i], kernel_size=(1, 1),
+            #         bn=True
+            #     )
+            # )
 
         # ###################### upsample stages #############################
         self.cnn_up_stages = nn.ModuleList([
@@ -307,7 +315,7 @@ class FFB6D(nn.Module):
         
         # Dirctly concat pseudo-rgb and depth together
         # rgb_emb = self.cnn_pre_stages(torch.cat((inputs['rgb'],inputs['depth'].unsqueeze(dim=1)),dim=1))  
-    
+        
         rgb_emb = self.cnn_pre_stages(inputs['rgb']) 
         depth_emb0 = self.cnn_pre_stages_depth(inputs['depth'].unsqueeze(dim=1)) 
         # rndla pre

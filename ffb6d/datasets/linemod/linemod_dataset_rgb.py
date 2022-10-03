@@ -210,10 +210,10 @@ class Dataset():
 
     def get_item(self, item_name):
         
-        if "pkl" in item_name:
+        if ".npz" in item_name:
             
             #item_name_full = os.path.join(self.config.lm_root, item_name)
-            data = pkl.load(open(item_name, "rb"))
+            data = np.load(item_name) 
             dpt_mm = data['depth'] * 1000.
             rgb = data['rgb']
             rgb = np.float32(rgb)

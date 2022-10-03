@@ -20,11 +20,17 @@ class ConfigRandLA:
     val_batch_size = opt.val_batch_size  # batch_size during validation and test
     train_steps = opt.train_steps  # Number of steps per epochs
     val_steps = opt.val_steps  # Number of validation steps per epoch
-    in_c = opt.in_c # input channels
-
+    if opt.depth_only or opt.rgb_only:
+        in_c = 9 # input channels
+    else:
+        in_c = 12
     sub_sampling_ratio = opt.sub_sampling_ratio  # sampling ratio of random sampling at each layer
     d_out = opt.d_out  # feature dimension
     num_sub_points = [num_points // 4, num_points // 16, num_points // 64, num_points // 256]
+
+class PspNet:
+    psp_out = opt.psp_out
+    
 
 class Config:
     def __init__(self, ds_name='ycb', cls_type=''):

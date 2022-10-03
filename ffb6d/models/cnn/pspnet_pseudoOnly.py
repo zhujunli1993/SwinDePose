@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-import models.cnn.extractors as extractors
+import models.cnn.extractors_pseudoOnly as extractors_pseudoOnly
 
 
 class PSPModule(nn.Module):
@@ -51,7 +51,7 @@ class Modified_PSPNet(nn.Module):
                  deep_features_size=1024, backend='resnet18', pretrained=True
                  ):
         super(Modified_PSPNet, self).__init__()
-        self.feats = getattr(extractors, backend)(pretrained)
+        self.feats = getattr(extractors_pseudoOnly, backend)(pretrained)
         self.psp = PSPModule(psp_size, 1024, sizes)
         self.drop_1 = nn.Dropout2d(p=0.3)
 
@@ -97,7 +97,7 @@ class PSPNet(nn.Module):
             deep_features_size=1024, backend='resnet18', pretrained=False
     ):
         super(PSPNet, self).__init__()
-        self.feats = getattr(extractors, backend)(pretrained)
+        self.feats = getattr(extractors_pseudoOnly, backend)(pretrained)
         self.psp = PSPModule(psp_size, 1024, sizes)
         self.drop_1 = nn.Dropout2d(p=0.3)
 

@@ -14,6 +14,7 @@ import tqdm
 import shutil
 import resource
 import numpy as np
+from cv2 import imshow, waitKey
 
 import torch
 import torch.optim as optim
@@ -28,14 +29,13 @@ import wandb
 from config.options import BaseOptions
 from config.common import Config, ConfigRandLA
 
-import datasets.ycb.ycb_dataset_full as dataset_desc
+import models.pytorch_utils as pt_utils
+# Depth only network architecture is as same as RGB only network. So re-use ffb6d_rgb
+from models.ffb6d_rgb import FFB6D
+from models.loss import OFLoss, FocalLoss
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
-from config.options import BaseOptions
-import models.pytorch_utils as pt_utils
-from ffb6d.models.ffb6d_rgb import FFB6D
-from models.loss import OFLoss, FocalLoss
-
+import datasets.linemod.linemod_dataset_onlyDepth as dataset_desc_depth
 from apex.parallel import DistributedDataParallel
 from apex.parallel import convert_syncbn_model
 from apex import amp
@@ -43,7 +43,7 @@ from apex import amp
 # get options
 opt = BaseOptions().parse()
 
-config = Config(opt.dataset_name)
+config = Config(ds_name=opt.dataset_name, cls_type=opt.linemod_cls)
 bs_utils = Basic_Utils(config)
 
 # create log folders 
@@ -63,6 +63,7 @@ for i in range(config.n_objects):
     col_mul = (255 * 255 * 255) // (i+1)
     color = (col_mul//(255*255), (col_mul//255) % 255, col_mul % 255)
     color_lst.append(color)
+
 
 
 
@@ -99,19 +100,17 @@ def checkpoint_state(model=None, optimizer=None, best_prec=None, epoch=None, it=
         "amp": amp.state_dict(),
     }
 
+
 def save_checkpoint(
-        state, is_best, filename="checkpoint", bestname="model_best",
-        bestname_pure='ffb6d_best'
+        state,  filename="checkpoint"
 ):
     filename = "{}.pth.tar".format(filename)
     torch.save(state, filename)
-    if is_best:
-        shutil.copyfile(filename, "{}.pth.tar".format(bestname))
-        shutil.copyfile(filename, "{}.pth.tar".format(bestname_pure))
+
 
 
 def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
-    filename = "{}.pth.tar".format(filename)
+    
 
     if os.path.isfile(filename):
         print("==> Loading from checkpoint '{}'".format(filename))
@@ -139,7 +138,7 @@ def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
         return None
 
 
-# def view_labels(rgb_chw, cld_cn, labels, K=config.intrinsic_matrix['ycb_K1']):
+# def view_labels(rgb_chw, cld_cn, labels, K=config.intrinsic_matrix['linemod']):
 #     rgb_hwc = np.transpose(rgb_chw[0].numpy(), (1, 2, 0)).astype("uint8").copy()
 #     cld_nc = np.transpose(cld_cn.numpy(), (1, 0)).copy()
 #     p2ds = bs_utils.project_p3d(cld_nc, 1.0, K).astype(np.int32)
@@ -166,14 +165,15 @@ def model_fn_decorator(
         model, data, it=0, epoch=0, is_eval=False, is_test=False, finish_test=False,
         test_pose=False
     ):
+        
         if finish_test:
-            teval.cal_auc()
+            teval.cal_lm_add(config.cls_id)
             return None
         if is_eval:
             model.eval()
         with torch.set_grad_enabled(not is_eval):
             cu_dt = {}
-            # device = torch.device('cuda:{}'.format(opt.local_rank))
+            # device = torch.device('cuda:{}'.format(args.local_rank))
             for key in data.keys():
                 if data[key].dtype in [np.float32, np.uint8]:
                     cu_dt[key] = torch.from_numpy(data[key].astype(np.float32)).cuda()
@@ -183,7 +183,7 @@ def model_fn_decorator(
                     cu_dt[key] = data[key].float().cuda()
                 elif data[key].dtype in [torch.int32, torch.int16]:
                     cu_dt[key] = data[key].long().cuda()
-
+            
             end_points = model(cu_dt)
 
             labels = cu_dt['labels']
@@ -204,6 +204,18 @@ def model_fn_decorator(
 
             _, cls_rgbd = torch.max(end_points['pred_rgbd_segs'], 1)
             acc_rgbd = (cls_rgbd == labels).float().sum() / labels.numel()
+
+            # if args.debug:
+            #     show_lb = view_labels(
+            #         data['rgb'], data['cld_rgb_nrm'][0, :3, :], cls_rgbd
+            #     )
+            #     show_gt_lb = view_labels(
+            #         data['rgb'], data['cld_rgb_nrm'][0, :3, :],
+            #         cu_dt['labels'].squeeze()
+            #     )
+            #     imshow("pred_lb", show_lb)
+            #     imshow('gt_lb', show_gt_lb)
+            #     waitKey(0)
 
             loss_dict = {
                 'loss_rgbd_seg': loss_rgbd_seg.item(),
@@ -226,15 +238,16 @@ def model_fn_decorator(
                             "train_acc": acc_dict})
             if is_test and test_pose:
                 cld = cu_dt['cld_rgb_nrm'][:, :3, :].permute(0, 2, 1).contiguous()
-
+                
                 if not opt.test_gt:
                     # eval pose from point cloud prediction.
                     teval.eval_pose_parallel(
                         cld, cu_dt['rgb'], cls_rgbd, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],
-                        cu_dt['kp_3ds'], cu_dt['ctr_3ds'], min_cnt=1,
-                        use_ctr_clus_flter=True, use_ctr=True, ds='ycb'
+                        cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
+                        ds='linemod', obj_id=config.cls_id,
+                        min_cnt=1, use_ctr_clus_flter=True, use_ctr=True,
                     )
                 else:
                     # test GT labels, keypoint and center point offset
@@ -243,8 +256,10 @@ def model_fn_decorator(
                     teval.eval_pose_parallel(
                         cld, cu_dt['rgb'], labels, gt_ctr_ofs,
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
-                        cu_dt['RTs'], gt_kp_ofs, cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
-                        min_cnt=1, use_ctr_clus_flter=True, use_ctr=True, ds='ycb'
+                        cu_dt['RTs'], gt_kp_ofs,
+                        cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
+                        ds='linemod', obj_id=config.cls_id,
+                        min_cnt=1, use_ctr_clus_flter=True, use_ctr=True
                     )
 
         return (
@@ -281,7 +296,6 @@ class Trainer(object):
         model_fn,
         optimizer,
         checkpoint_name="ckpt",
-        best_name="best",
         lr_scheduler=None,
         bnm_scheduler=None,
         viz=None,
@@ -294,20 +308,19 @@ class Trainer(object):
             bnm_scheduler,
         )
 
-        self.checkpoint_name, self.best_name = checkpoint_name, best_name
+        self.checkpoint_name = checkpoint_name
 
         self.training_best, self.eval_best = {}, {}
         self.viz = viz
 
-    def eval_epoch(self, d_loader, epoch, is_test=False, test_pose=False, it=0):
+    def eval_epoch(self, d_loader, epoch,  is_test=False, test_pose=False):
         self.model.eval()
 
         eval_dict = {}
         total_loss = 0.0
         count = 1
-        for i, data in tqdm.tqdm(
-            enumerate(d_loader), leave=False, desc="val"
-        ):
+        for _, data in enumerate(d_loader):
+        
             count += 1
             self.optimizer.zero_grad()
 
@@ -332,7 +345,7 @@ class Trainer(object):
                 acc_dict[k] = v
         for k, v in mean_eval_dict.items():
             print(k, v)
-
+        
         if is_test:
             if test_pose:
                 self.model_fn(
@@ -347,11 +360,12 @@ class Trainer(object):
                     print(k, v, file=of)
         if opt.local_rank == 0:
             print(acc_dict)
-            # writer.add_scalars('val_acc', acc_dict, it)
+            
             wandb.log({"epoch": epoch,
-                            "it": it,
-                            "val_acc": acc_dict})
-
+                        "val_acc": acc_dict,
+                        "val_loss": total_loss / count})
+            
+            
         return total_loss / count, eval_dict
 
     def train(
@@ -364,8 +378,7 @@ class Trainer(object):
         test_loader=None,
         best_loss=0.0,
         log_epoch_f=None,
-        tot_iter=1,
-        clr_div=6,
+        tot_iter=1
     ):
         """
            Call to begin training the model
@@ -383,108 +396,90 @@ class Trainer(object):
         best_loss : float
             Testing loss of the best model
         """
-
+        
         print("Totally train %d iters per gpu." % tot_iter)
 
-        def is_to_eval(epoch, it):
-            # Eval after first 100 iters to test eval function.
-            if it == 100:
-                return True, 1
-            wid = tot_iter // clr_div
-            if (it // wid) % 2 == 1:
-                eval_frequency = wid // 15
-            else:
-                eval_frequency = wid // 6
-            to_eval = (it % eval_frequency) == 0
-            return to_eval, eval_frequency
+        # def is_to_eval(epoch, it):
+        #     if it == 100:
+        #         return True, 1
+        #     wid = tot_iter // clr_div
+        #     if (it // wid) % 2 == 1:
+        #         eval_frequency = wid // 15
+        #     else:
+        #         eval_frequency = wid // 6
+        #     to_eval = (it % eval_frequency) == 0
+        #     return to_eval, eval_frequency
 
+        # it = start_it
+        # _, eval_frequency = is_to_eval(0, it)
+        
+        # Early stopping
+        last_loss = 1e10
+        patience = 7
+        trigger_times = 0
         it = start_it
-        _, eval_frequency = is_to_eval(0, it)
+        for start_epoch in tqdm.tqdm(range(n_epochs)):
+            
+            if train_sampler is not None:
+                train_sampler.set_epoch(start_epoch)
+            # Reset numpy seed.
+            # REF: https://github.com/pytorch/pytorch/issues/5059
+            np.random.seed()
+            if log_epoch_f is not None:
+                os.system("echo {} > {}".format(start_epoch, log_epoch_f))
+            for batch in tqdm.tqdm(train_loader):
+                self.model.train()
 
-        with tqdm.tqdm(range(opt.n_total_epoch), desc="epochs") as tbar, tqdm.tqdm(
-            total=eval_frequency, leave=False, desc="train"
-        ) as pbar:
-            for epoch in tbar:
-                if epoch > opt.n_total_epoch:
-                    break
-                if train_sampler is not None:
-                    train_sampler.set_epoch(epoch)
-                # Reset numpy seed.
-                # REF: https://github.com/pytorch/pytorch/issues/5059
-                np.random.seed()
-                if log_epoch_f is not None:
-                    os.system("echo {} > {}".format(epoch, log_epoch_f))
-                for batch in train_loader:
-                    self.model.train()
+                self.optimizer.zero_grad()
+                _, loss, res = self.model_fn(self.model, batch, it=it)
 
-                    self.optimizer.zero_grad()
-                    _, loss, res = self.model_fn(self.model, batch, it=it)
+                with amp.scale_loss(loss, self.optimizer) as scaled_loss:
+                    scaled_loss.backward()
 
-                    with amp.scale_loss(loss, self.optimizer) as scaled_loss:
-                        scaled_loss.backward()
-                    lr = get_lr(self.optimizer)
-                    # if opt.local_rank == 0:
-                    #     writer.add_scalar('lr/lr', lr, it)
-                        
+                self.optimizer.step()
 
-                    self.optimizer.step()
+                if self.lr_scheduler is not None:
+                    self.lr_scheduler.step()
 
-                    if self.lr_scheduler is not None:
-                        self.lr_scheduler.step(it)
+                if self.bnm_scheduler is not None:
+                    self.bnm_scheduler.step()
 
-                    if self.bnm_scheduler is not None:
-                        self.bnm_scheduler.step(it)
+                it += 1
+                
+                if self.viz is not None:
+                    self.viz.update("train", it, res)
 
-                    it += 1
+                # eval_flag, eval_frequency = is_to_eval(start_epoch, it)
+                
+            
+            if test_loader is not None:
+                val_loss, res = self.eval_epoch(test_loader, start_epoch)
 
-                    pbar.update()
-                    pbar.set_postfix(dict(total_it=it))
-                    tbar.refresh()
-
-                    if self.viz is not None:
-                        self.viz.update("train", it, res)
-
-                    eval_flag, eval_frequency = is_to_eval(epoch, it)
-                    if eval_flag:
-                        pbar.close()
-
-                        if test_loader is not None:
-                            val_loss, res = self.eval_epoch(test_loader, epoch, it=it)
-                            print("val_loss", val_loss)
-
-                            is_best = val_loss < best_loss
-                            best_loss = min(best_loss, val_loss)
-                            if opt.local_rank == 0:
-                                save_checkpoint(
-                                    checkpoint_state(
-                                        self.model, self.optimizer, val_loss, epoch, it
-                                    ),
-                                    is_best,
-                                    filename=self.checkpoint_name,
-                                    bestname=self.best_name+'_%.4f' % val_loss,
-                                    bestname_pure=self.best_name
-                                )
-                                info_p = self.checkpoint_name.replace(
-                                    '.pth.tar', '_epoch.txt'
-                                )
-                                os.system(
-                                    'echo {} {} >> {}'.format(
-                                        it, val_loss, info_p
-                                    )
-                                )
-
-                        pbar = tqdm.tqdm(
-                            total=eval_frequency, leave=False, desc="train"
-                        )
-                        pbar.set_postfix(dict(total_it=it))
-
-            # if opt.local_rank == 0:
-            #     writer.export_scalars_to_json("./all_scalars.json")
-            #     writer.close()
-        return best_loss
+                if val_loss < best_loss:
+                    best_loss = val_loss
+                    if opt.local_rank == 0:
+                        save_checkpoint(
+                            checkpoint_state(
+                                self.model, self.optimizer, val_loss, start_epoch, it
+                            ),
+                            filename=self.checkpoint_name)
+                # Early Stopping
+                current_loss = val_loss
+                if current_loss > last_loss:
+                    trigger_times += 1
+                    if trigger_times >= patience:
+                        print('Early Stopping!\n')
+                        exit()
+                else:
+                    trigger_times = 0
+                last_loss = current_loss
+        
+        return val_loss
 
 
 def train():
+    
+    
     print("local_rank:", opt.local_rank)
     cudnn.benchmark = True
     if opt.deterministic:
@@ -497,24 +492,24 @@ def train():
         backend='nccl',
         init_method='env://',
     )
-    
 
     if not opt.eval_net:
-        train_ds = dataset_desc.Dataset('train')
+
+        train_ds = dataset_desc_depth.Dataset('train', cls_type=opt.linemod_cls)
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_ds)
         train_loader = torch.utils.data.DataLoader(
             train_ds, batch_size=opt.mini_batch_size, shuffle=False,
             drop_last=True, num_workers=opt.num_threads, sampler=train_sampler, pin_memory=opt.pin_memory
         )
 
-        val_ds = dataset_desc.Dataset('test')
+        val_ds = dataset_desc_depth.Dataset('test', cls_type=opt.linemod_cls)
         val_sampler = torch.utils.data.distributed.DistributedSampler(val_ds)
         val_loader = torch.utils.data.DataLoader(
             val_ds, batch_size=opt.val_mini_batch_size, shuffle=False,
             drop_last=False, num_workers=opt.num_threads, sampler=val_sampler
         )
     else:
-        test_ds = dataset_desc.Dataset('test')
+        test_ds = dataset_desc_depth.Dataset('test', cls_type=opt.linemod_cls)
         test_loader = torch.utils.data.DataLoader(
             test_ds, batch_size=opt.test_mini_batch_size, shuffle=False,
             num_workers=opt.num_threads
@@ -544,6 +539,7 @@ def train():
 
     # load status from checkpoint
     if opt.load_checkpoint is not None:
+        
         checkpoint_status = load_checkpoint(
             model, optimizer, filename=opt.load_checkpoint
         )
@@ -554,8 +550,7 @@ def train():
 
     if not opt.eval_net:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[opt.local_rank], output_device=opt.local_rank,
-            find_unused_parameters=True
+            model, device_ids=[opt.local_rank], output_device=opt.local_rank
         )
         clr_div = 6
         lr_scheduler = CyclicLR(
@@ -581,7 +576,7 @@ def train():
     if opt.eval_net:
         model_fn = model_fn_decorator(
             FocalLoss(gamma=2), OFLoss(),
-            opt.test,
+            opt.test, 
         )
     else:
         model_fn = model_fn_decorator(
@@ -589,14 +584,13 @@ def train():
             opt.test,
         )
 
-    checkpoint_fd = opt.save_checkpoint 
+    checkpoint_fd = opt.save_checkpoint
 
     trainer = Trainer(
         model,
         model_fn,
         optimizer,
-        checkpoint_name=os.path.join(checkpoint_fd, "FFB6D"),
-        best_name=os.path.join(checkpoint_fd, "FFB6D_best"),
+        checkpoint_name=os.path.join(checkpoint_fd, "FFB6D_%s" % opt.linemod_cls),
         lr_scheduler=lr_scheduler,
         bnm_scheduler=bnm_scheduler,
     )
@@ -604,7 +598,7 @@ def train():
     if opt.eval_net:
         start = time.time()
         val_loss, res = trainer.eval_epoch(
-            test_loader, is_test=True, test_pose=opt.test_pose
+            test_loader, opt.n_total_epoch, is_test=True, test_pose=opt.test_pose
         )
         end = time.time()
         print("\nUse time: ", end - start, 's')
@@ -612,12 +606,12 @@ def train():
         trainer.train(
             it, start_epoch, opt.n_total_epoch, train_loader, None,
             val_loader, best_loss=best_loss,
-            tot_iter=opt.n_total_epoch * train_ds.minibatch_per_epoch // opt.gpus,
-            clr_div=clr_div
+            tot_iter=opt.n_total_epoch * train_ds.minibatch_per_epoch // opt.gpus
         )
 
         if start_epoch == opt.n_total_epoch:
             _ = trainer.eval_epoch(val_loader)
+
 
 if __name__ == "__main__":
     opt.world_size = opt.gpus * opt.nodes
@@ -627,4 +621,5 @@ if __name__ == "__main__":
                job_type="training",
                name=opt.wandb_name,
                reinit=True)
+    
     train()

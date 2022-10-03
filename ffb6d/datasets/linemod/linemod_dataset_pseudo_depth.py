@@ -345,11 +345,22 @@ class Dataset():
         return new_img_angles, new_img_signed
     
     
+    def scale_pseudo(self, pseudo):
+    # Scale the pseudo angles and signed angles to image range (0 ~ 255)
+        pseudo[:,:,0][pseudo[:,:,0]==360] = 255
+        pseudo[:,:,0][pseudo[:,:,0]<255] = (pseudo[:,:,0][pseudo[:,:,0]<255]-pseudo[:,:,0][pseudo[:,:,0]<255].min())*(254/(pseudo[:,:,0][pseudo[:,:,0]<255].max()-pseudo[:,:,0][pseudo[:,:,0]<255].min()))
+        pseudo[:,:,1][pseudo[:,:,1]==360] = 255
+        pseudo[:,:,1][pseudo[:,:,1]<255] = (pseudo[:,:,1][pseudo[:,:,1]<255]-pseudo[:,:,1][pseudo[:,:,1]<255].min())*(254/(pseudo[:,:,1][pseudo[:,:,1]<255].max()-pseudo[:,:,1][pseudo[:,:,1]<255].min()))
+        pseudo[:,:,2][pseudo[:,:,2]==360] = 255
+        pseudo[:,:,2][pseudo[:,:,2]<255] = (pseudo[:,:,2][pseudo[:,:,2]<255]-pseudo[:,:,2][pseudo[:,:,2]<255].min())*(254/(pseudo[:,:,2][pseudo[:,:,2]<255].max()-pseudo[:,:,2][pseudo[:,:,2]<255].min()))
+        return pseudo
+
     def get_item(self, item_name):
         
-        if "pkl" in item_name:
+        if ".npz" in item_name:
+            
             #item_name_full = os.path.join(self.config.lm_root, item_name)
-            data = pkl.load(open(item_name, "rb"))
+            data = np.load(item_name) 
             dpt_mm = data['depth'] * 1000.
             
             dpt_mm_rgb = dpt_mm.copy()
@@ -381,22 +392,27 @@ class Dataset():
                 labels = np.array(li)
                 labels = (labels > 0).astype("uint8")
             #with Image.open(os.path.join(self.cls_root, "pseudo_angles/{}.png".format(item_name))) as ri:
-            import pdb; pdb.set_trace()
+            
             with np.load(os.path.join(self.cls_root, "pseudo_angles_signed/{}.npz".format(item_name))) as data:
                 angles = data['angles']
                 signed = data['signed']
-                valid_msk = ~np.all(angles == np.array([360,360,360]), axis=-1)
-                valid_index = np.where(valid_msk==True)
-                angles_msked = 
+                # scaling = []
+                # convert angles and signed angles to image range (0~255)
+                sed_angles = self.scale_pseudo(angles)
+                sed_signed = self.scale_pseudo(signed)
+                # valid_msk = ~np.all(angles == np.array([360,360,360]), axis=-1)
+                # valid_index = np.where(valid_msk==True)
+                sed_angles = Image.fromarray(np.uint8(sed_angles))
+                sed_signed = Image.fromarray(np.uint8(sed_signed))
                 if self.add_noise:
-                    ri = self.trancolor()
+                    sed_angles = self.trancolor(sed_angles)
                     
-                rgb = np.array(ri)[:, :, :3]
+                rgb = np.array(sed_angles)[:, :, :3]
             #with Image.open(os.path.join(self.cls_root, "pseudo_signed/{}.png".format(item_name))) as rs:
                 if self.add_noise:
-                    rs = self.trancolor(rs)
-                rgb_s = np.array(rs)[:, :, :3]
-            valid_dpt_mm = np.ma.masked_array(dpt_mm, valid_msk)
+                    sed_signed = self.trancolor(sed_signed)
+                rgb_s = np.array(sed_signed)[:, :, :3]
+            #valid_dpt_mm = np.ma.masked_array(dpt_mm, valid_msk)
                 
                 
             
@@ -462,10 +478,9 @@ class Dataset():
             if self.rng.rand() > 0.8:
                 rgb = self.rgb_add_noise(rgb)
                 rgb_s = self.rgb_add_noise(rgb_s)
-        if self.opt.full or self.opt.add_depth:        
-            rgb_c = np.concatenate((rgb, rgb_s), axis=2)  #[h,w,6]
-        else:
-            rgb_c = rgb
+    
+        rgb_c = np.concatenate((rgb, rgb_s), axis=2)  #[h,w,6]
+        
             
         msk_dp = dpt_mm > 1e-6
         choose = msk_dp.flatten().nonzero()[0].astype(np.uint32)
@@ -488,10 +503,9 @@ class Dataset():
         choose = choose[sf_idx]
 
         cld = dpt_xyz.reshape(-1, 3)[choose, :]
-        if self.opt.full or self.opt.add_depth:
-            rgb_c_pt = rgb_c.reshape(-1, 6)[choose, :].astype(np.float32)
-        else:
-            rgb_c_pt = rgb_c.reshape(-1, 3)[choose, :].astype(np.float32)
+
+        rgb_c_pt = rgb_c.reshape(-1, 6)[choose, :].astype(np.float32)
+        
         nrm_pt = nrm_map[:, :, :3].reshape(-1, 3)[choose, :]
         labels_pt = labels.flatten()[choose]
         choose = np.array([choose])
