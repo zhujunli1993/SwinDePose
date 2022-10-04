@@ -550,7 +550,7 @@ def train():
 
     if not opt.eval_net:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[opt.local_rank], output_device=opt.local_rank
+            model, device_ids=[opt.local_rank], output_device=opt.local_rank,find_unused_parameters=True
         )
         clr_div = 6
         lr_scheduler = CyclicLR(

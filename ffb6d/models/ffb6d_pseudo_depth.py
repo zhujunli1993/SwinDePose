@@ -90,7 +90,7 @@ class FFB6D(nn.Module):
         for i in range(4):
             if opt.attention:
                 self.encoder_layer = nn.TransformerEncoderLayer(d_model=(self.ds_rgb_oc[i]+self.ds_depth_oc_fuse[i]), nhead=1)
-                self.ds_fuse_fd_fuse_layers.append(nn.TransformerEncoder(self.encoder_layer, num_layers=4))
+                self.ds_fuse_fd_fuse_layers.append(nn.TransformerEncoder(self.encoder_layer, num_layers=1))
                 # self.ds_transformer.append(
                 #     pt_utils.Conv2d(
                 #     self.ds_rgb_oc[i]+self.ds_depth_oc_fuse[i], self.ds_rgb_oc[i], kernel_size=(1, 1),
@@ -337,7 +337,7 @@ class FFB6D(nn.Module):
         ds_emb = []
         
         for i_ds in range(4):
-            import pdb; pdb.set_trace()
+            
             # encode rgb downsampled feature
             rgb_emb0 = self.cnn_ds_stages[i_ds](rgb_emb)
             # encode depth downsampled feature

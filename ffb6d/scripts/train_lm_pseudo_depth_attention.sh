@@ -1,7 +1,7 @@
 #!/bin/bash
 GPU_NUM=6
 GPU_COUNT=1
-NAME='vtesting'
+NAME='lm_5_pseudo_noSyn_addDepth_attention'
 WANDB_PROJ='pose_estimation'
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
 CLS='phone'
@@ -22,8 +22,10 @@ python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 500
     --linemod_cls=$CLS \
     --lm_no_fuse --lm_no_render --add_depth --depth_split \
     --attention \
-    --psp_out 512 \
+    --psp_out 256 \
+    --ds_rgb_oc 64 128 256 256 \
     --ds_depth_oc_fuse 64 128 256 256 \
-    --up_depth_oc 256 128 64 64 \
     --ds_depth_oc 64 128 256 \
+    --up_depth_oc 256 128 64 64 \
+    --up_rgb_oc 256 64 64 \
     --log_eval_dir $LOG_EVAL_DIR --save_checkpoint $SAVE_CHECKPOINT --log_traininfo_dir $LOG_TRAININFO_DIR \
