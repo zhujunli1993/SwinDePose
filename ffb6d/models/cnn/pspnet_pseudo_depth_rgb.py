@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 from torch.nn import functional as F
-import models.cnn.extractors_pseudo_depth as extractors_pseudo_depth
+import models.cnn.extractors_pseudo_depth_rgb as extractors_pseudo_depth_rgb
 from config.options import BaseOptions
 opt = BaseOptions().parse()
 
@@ -52,7 +52,7 @@ class Modified_PSPNet(nn.Module):
                  deep_features_size=1024, backend='resnet18', pretrained=True
                  ):
         super(Modified_PSPNet, self).__init__()
-        self.feats = getattr(extractors_pseudoOnly, backend)(pretrained)
+        self.feats = getattr(extractors_pseudo_depth_rgb, backend)(pretrained)
         self.psp = PSPModule(psp_size, 1024, sizes)
         self.drop_1 = nn.Dropout2d(p=0.3)
 
@@ -98,7 +98,7 @@ class PSPNet(nn.Module):
             deep_features_size=1024, backend='resnet18', pretrained=False
     ):
         super(PSPNet, self).__init__()
-        self.feats = getattr(extractors_pseudo_depth, backend)(pretrained)
+        self.feats = getattr(extractors_pseudo_depth_rgb, backend)(pretrained)
         self.psp = PSPModule(psp_size, opt.psp_out, sizes)
         self.drop_1 = nn.Dropout2d(p=0.3)
 

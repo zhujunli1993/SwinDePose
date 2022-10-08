@@ -3,7 +3,7 @@ GPU_NUM=4
 GPU_COUNT=1
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
 CLS='phone'
-NAME='vtesting'
+NAME='lm_rgb_noSyn'
 
 EXP_DIR='/workspace/REPO/pose_estimation/ffb6d/train_log'
 LOG_EVAL_DIR="$EXP_DIR/$NAME/$CLS/eval_results"

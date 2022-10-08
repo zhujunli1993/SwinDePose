@@ -20,5 +20,11 @@ python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 600
     --load_checkpoint $tst_mdl \
     --test --test_pose --eval_net \
     --depth_only \
+    --psp_out 1024 \
+    --psp_size 512 \
+    --ds_rgb_oc 64 128 256 512 \
+    --ds_depth_oc_fuse 64 128 256 256 \
+    --ds_depth_oc 64 128 256 \
+    --up_rgb_oc 256 64 64 \
     --log_eval_dir $LOG_EVAL_DIR --save_checkpoint $SAVE_CHECKPOINT --log_traininfo_dir $LOG_TRAININFO_DIR
 

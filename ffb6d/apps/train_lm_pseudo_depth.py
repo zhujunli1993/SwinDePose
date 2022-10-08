@@ -30,7 +30,6 @@ from config.options import BaseOptions
 from config.common import Config, ConfigRandLA
 
 import models.pytorch_utils as pt_utils
-from models.ffb6d_pseudo_depth_mlp import FFB6D
 from models.loss import OFLoss, FocalLoss
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
@@ -43,7 +42,10 @@ from apex import amp
     
 # get options
 opt = BaseOptions().parse()
-
+if opt.attention:
+    from models.ffb6d_pseudo_depth import FFB6D
+else:
+    from models.ffb6d_pseudo_depth_mlp import FFB6D
 config = Config(ds_name=opt.dataset_name, cls_type=opt.linemod_cls)
 bs_utils = Basic_Utils(config)
 

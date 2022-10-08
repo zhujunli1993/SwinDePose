@@ -1,7 +1,7 @@
 #!/bin/bash
 GPU_NUM=6
 GPU_COUNT=1
-NAME='lm_6_pseudo_noSyn_depth_RGB_mlp'
+NAME='lm_5_pseudo_noSyn_addDepth_attention'
 WANDB_PROJ='pose_estimation'
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
 CLS='phone'
@@ -10,8 +10,8 @@ LOG_EVAL_DIR="$EXP_DIR/$NAME/$CLS/eval_results"
 SAVE_CHECKPOINT="$EXP_DIR/$NAME/$CLS/checkpoints"
 LOG_TRAININFO_DIR="$EXP_DIR/$NAME/$CLS/train_info"
 # checkpoint to resume. 
-#tst_mdl="train_log/linemod_half_pseang_1/checkpoints/${cls}/FFB6D_${cls}_best.pth.tar"
-python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 50000 apps/train_lm_pseudo_depth_rgb.py \
+tst_mdl="$SAVE_CHECKPOINT/FFB6D_$CLS.pth.tar"
+python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 50000 apps/train_lm_pseudo_depth.py \
     --gpus=$GPU_COUNT \
     --wandb_proj $WANDB_PROJ \
     --wandb_name $NAME \
@@ -21,12 +21,13 @@ python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 500
     --train_list 'train.txt' --test_list 'test.txt' \
     --linemod_cls=$CLS \
     --lm_no_fuse --lm_no_render --add_depth --depth_split \
-    --add_rgb \
+    --attention \
     --psp_out 256 \
     --ds_rgb_oc 64 128 256 256 \
-    --ds_rgb_oc_ori 64 128 256 512 \
-    --ds_depth_oc_fuse 128 256 512 512 \
-    --ds_depth_oc 64 128 256 512 \
-    --up_depth_oc 512 256 64 64 \
+    --ds_depth_oc_fuse 64 128 256 256 \
+    --ds_depth_oc 64 128 256 \
+    --up_depth_oc 256 128 64 64 \
     --up_rgb_oc 256 64 64 \
+    --load_checkpoint $tst_mdl \
+    --test --test_pose --eval_net \
     --log_eval_dir $LOG_EVAL_DIR --save_checkpoint $SAVE_CHECKPOINT --log_traininfo_dir $LOG_TRAININFO_DIR \

@@ -30,11 +30,11 @@ from config.options import BaseOptions
 from config.common import Config, ConfigRandLA
 
 import models.pytorch_utils as pt_utils
-from models.ffb6d_pseudo_depth import FFB6D
+from models.ffb6d_pseudo_depth_rgb_mlp import FFB6D
 from models.loss import OFLoss, FocalLoss
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
-import datasets.linemod.linemod_dataset_pseudo_depth as dataset_desc
+import datasets.linemod.linemod_dataset_pseudo_depth_rgb as dataset_desc
 from apex.parallel import DistributedDataParallel
 from apex.parallel import convert_syncbn_model
 from apex import amp

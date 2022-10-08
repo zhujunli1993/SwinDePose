@@ -49,7 +49,7 @@ class BaseOptions():
         g_exp.add_argument('--add_depth', action='store_true', help='if true, add depth to input')
         g_exp.add_argument('--depth_split', action='store_true', help='if true, add depth to input and consider depth channel as a seperate info')
         g_exp.add_argument('--attention', action='store_true', help='if true, use self-attention module to fuse the pseudo and depth emb.')
-        
+        g_exp.add_argument('--add_rgb', action='store_true', help='if true, add real RGB channel to pseudo_depth_rgb experiments.')
         # Training related
         g_train = parser.add_argument_group('Training')
         g_train.add_argument('--log_eval_dir', type=str, help='path to save evaluation results' )
@@ -114,7 +114,9 @@ class BaseOptions():
         g_model.add_argument('--psp_size', default=256, type=int, help='psp size for psp layer initial, maybe equal to the last second emb_length of ds_rgb_oc.')
         g_model.add_argument('--ds_depth_oc',nargs='+', default=[64, 128, 256, 512], type=int, help='depth image emb length for downsampling.')
         g_model.add_argument('--ds_rgb_oc',nargs='+', default=[64, 128, 256, 512], type=int, help='pseudo image emb length.')
+        g_model.add_argument('--ds_rgb_oc_ori',nargs='+', default=[64, 128, 256, 512], type=int, help='real RGB image emb length for pseudo_depth_rgb experiments.')
         g_model.add_argument('--ds_depth_oc_fuse',nargs='+', default=[128, 256, 512, 512], type=int, help='depth and pseudo fused emb length.')
+        g_model.add_argument('--ds_rgb_ori_oc_fuse',nargs='+', default=[128, 256, 512, 512], type=int, help='depth and pseudo and real RGB fused emb length.')
         g_model.add_argument('--up_depth_oc',nargs='+', default=[512, 256, 64, 64], type=int, help='depth image emb length for upsampling.')
         g_model.add_argument('--up_rgb_oc',nargs='+', default=[256, 64, 64], type=int, help='pseudo image emb length for upsampling.')
         
