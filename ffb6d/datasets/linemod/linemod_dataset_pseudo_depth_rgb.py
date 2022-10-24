@@ -30,6 +30,10 @@ class Dataset():
         self.config = Config(ds_name=dataset_name, cls_type=self.opt.linemod_cls)
         self.bs_utils = Basic_Utils(self.config)
         self.dataset_name = dataset_name
+        if self.opt.crop:
+            self.opt.width, self.opt.height = self.opt.max_w, self.opt.max_h
+            self.opt.n_sample_points = self.opt.width * self.opt.height // 24
+            
         self.xmap = np.array([[j for i in range(self.opt.width)] for j in range(self.opt.height)])
         self.ymap = np.array([[i for i in range(self.opt.width)] for j in range(self.opt.height)])
 
@@ -361,7 +365,7 @@ class Dataset():
         pseudo[:,:,2][pseudo[:,:,2]==360] = 255
         pseudo[:,:,2][pseudo[:,:,2]<255] = (pseudo[:,:,2][pseudo[:,:,2]<255]-pseudo[:,:,2][pseudo[:,:,2]<255].min())*(254/(pseudo[:,:,2][pseudo[:,:,2]<255].max()-pseudo[:,:,2][pseudo[:,:,2]<255].min()))
         return pseudo
-
+    
     def get_item(self, item_name):
         
         if ".npz" in item_name:
@@ -424,8 +428,6 @@ class Dataset():
                 rgb_s = np.array(sed_signed)[:, :, :3]
             #valid_dpt_mm = np.ma.masked_array(dpt_mm, valid_msk)
                 
-                
-            
             meta = self.meta_lst[int(item_name)]
             if self.cls_id == 2:
                 for i in range(0, len(meta)):
@@ -448,10 +450,10 @@ class Dataset():
             dpt_mm_rgb = factor * (dpt_mm_rgb - second_min)
             dpt_mm_rgb[index] = 255
             
-        
         cam_scale = 1000.0
         
         dpt_mm = dpt_mm.copy().astype(np.uint16)
+        
         nrm_map = normalSpeed.depth_normal(
             dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False
         )
@@ -460,6 +462,7 @@ class Dataset():
         #     imshow("nrm_map", show_nrm_map)
 
         dpt_m = dpt_mm.astype(np.float32) / cam_scale
+        
         dpt_xyz = self.dpt_2_pcld(dpt_m, 1.0, K)
         dpt_xyz[np.isnan(dpt_xyz)] = 0.0
         dpt_xyz[np.isinf(dpt_xyz)] = 0.0
@@ -521,7 +524,7 @@ class Dataset():
         labels_pt = labels.flatten()[choose]
         choose = np.array([choose])
         cld_rgb_nrm = np.concatenate((cld, rgb_c_pt, nrm_pt), axis=1).transpose(1, 0)
-
+        
         RTs, kp3ds, ctr3ds, cls_ids, kp_targ_ofst, ctr_targ_ofst = self.get_pose_gt_info(
             cld, labels_pt, RT
         )
@@ -604,8 +607,10 @@ class Dataset():
         #     "cls_ids:", cls_ids, "\n",
         #     "labels.unique:", np.unique(labels),
         # )
-
+        
+        
         item_dict = dict(
+            img_id=np.uint8(item_name),
             rgb=rgb_c.astype(np.uint8),  # [c, h, w]
             rgb_ori=rgb_ori.astype(np.uint8),
             depth=dpt_mm_rgb.astype(np.uint8), #[1, h, w]

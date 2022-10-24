@@ -10,6 +10,8 @@ def ensure_fd(fd):
 
 opt = BaseOptions().parse()
 class ConfigRandLA:
+    if opt.crop:
+        opt.height, opt.width = opt.max_h, opt.max_w
     k_n = opt.k_n  # KNN
     num_layers = opt.num_layers  # Number of layers
     num_points = opt.height * opt.width // 24  # Number of input points
@@ -94,8 +96,8 @@ class Config:
             self.fuse_path = os.path.join(self.lm_root, 'fuse/%s/*.pkl' % cls_type)
             self.test_path = os.path.join(self.cls_root, opt.test_list)
             if not opt.lm_no_fuse and not opt.lm_no_render:
-                self.render_files = os.path.join(self.lm_root, 'renders/%s/file_list_short.txt' % cls_type)
-                self.fuse_files = os.path.join(self.lm_root, 'fuse/%s/file_list_short.txt' % cls_type)
+                self.render_files = os.path.join(self.lm_root, 'renders/%s/file_list.txt' % cls_type)
+                self.fuse_files = os.path.join(self.lm_root, 'fuse/%s/file_list.txt' % cls_type)
             
             self.use_orbfps = True
             self.kp_orbfps_dir = os.path.join(self.lm_root, 'kps_orb9_fps')

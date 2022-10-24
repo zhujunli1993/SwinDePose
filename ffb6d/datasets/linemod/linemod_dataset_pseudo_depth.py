@@ -180,14 +180,23 @@ class Dataset():
         # bk_label_3c = np.repeat(bk_label[:, :, None], 3, 2)
         if len(bk_label.shape) > 2:
             bk_label = bk_label[:, :, 0]
-        with Image.open(os.path.join(self.cls_root, "pseudo_angles", real_item+'.png')) as ri:
-            back = np.array(ri)[:, :, :3] * bk_label[:, :, None]
-            # back = np.array(ri)[:, :, :3] * bk_label_3c
-        with Image.open(os.path.join(self.cls_root, "pseudo_signed", real_item+'.png')) as rs:
-            back_s = np.array(rs)[:, :, :3] * bk_label[:, :, None]
-            # back_s = np.array(rs)[:, :, :3] * bk_label_3c
+        # Add pseudo-background
+        with np.load(os.path.join(self.cls_root, "pseudo_angles_signed/{}.npz".format(real_item))) as data:
+            angles = data['angles']
+            signed = data['signed']
+            # convert angles and signed angles to image range (0~255)
+            sed_angles = self.scale_pseudo(angles)
+            sed_signed = self.scale_pseudo(signed)
+            sed_angles = Image.fromarray(np.uint8(sed_angles))
+            sed_signed = Image.fromarray(np.uint8(sed_signed))
+            back = np.array(sed_angles)[:, :, :3] * bk_label[:, :, None]
+            back_s = np.array(sed_signed)[:, :, :3] * bk_label[:, :, None]
+        
+        # Add real-RGB background
         # with Image.open(os.path.join(self.cls_root, "rgb", real_item+'.png')) as ri:
-        #     back = np.array(ri)[:, :, :3] * bk_label[:, :, None]
+        #     back_r = np.array(ri)[:, :, :3] * bk_label[:, :, None]
+        
+        
         dpt_back = real_dpt.astype(np.float32) * bk_label.astype(np.float32)
         
         if self.rng.rand() < 0.6:
@@ -358,7 +367,6 @@ class Dataset():
     def get_item(self, item_name):
         
         if ".npz" in item_name:
-            
             #item_name_full = os.path.join(self.config.lm_root, item_name)
             data = np.load(item_name) 
             dpt_mm = data['depth'] * 1000.
@@ -371,11 +379,16 @@ class Dataset():
             dpt_mm_rgb = factor * (dpt_mm_rgb - second_min)
             dpt_mm_rgb[index] = 255
 
-            rgb = data['angles'] # data['rgb'] actually contains pseudo angles image with background
-            rgb = np.float32(rgb)
-            rgb_s = data['signed']
-            rgb_s = np.float32(rgb_s)
+            angles = data['angles'] # data['rgb'] actually contains pseudo angles image with background
+            signed = data['signed']
+            # convert angles and signed angles to image range (0~255)
+            sed_angles = self.scale_pseudo(angles)
+            sed_signed = self.scale_pseudo(signed)
+            sed_angles = Image.fromarray(np.uint8(sed_angles))
+            sed_signed = Image.fromarray(np.uint8(sed_signed))
             
+            rgb = np.float32(sed_angles)
+            rgb_s = np.float32(sed_signed)
             labels = data['mask']
             K = data['K']
             RT = data['RT']
@@ -406,7 +419,6 @@ class Dataset():
                 sed_signed = Image.fromarray(np.uint8(sed_signed))
                 if self.add_noise:
                     sed_angles = self.trancolor(sed_angles)
-                    
                 rgb = np.array(sed_angles)[:, :, :3]
             #with Image.open(os.path.join(self.cls_root, "pseudo_signed/{}.png".format(item_name))) as rs:
                 if self.add_noise:
@@ -592,8 +604,10 @@ class Dataset():
         #     "cls_ids:", cls_ids, "\n",
         #     "labels.unique:", np.unique(labels),
         # )
-
+        if ".npz" in item_name:
+            item_name = item_name.split('/')[-1].split('.')[0]
         item_dict = dict(
+            img_id=np.uint8(item_name),
             rgb=rgb_c.astype(np.uint8),  # [c, h, w]
             depth=dpt_mm_rgb.astype(np.uint8), #[1, h, w]
             cld_rgb_nrm=cld_rgb_nrm.astype(np.float32),  # [9, npts]

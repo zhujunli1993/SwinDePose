@@ -219,7 +219,7 @@ def eval_one_frame_pose(
 # ###############################LineMOD Evaluation###############################
 
 def cal_frame_poses_lm(
-    pcld, mask, ctr_of, pred_kp_of, use_ctr, n_cls, use_ctr_clus_flter, obj_id,
+    pcld, mask, ctr_of, pred_kp_of, gt_kps, gt_ctr, use_ctr, n_cls, use_ctr_clus_flter, obj_id,
     debug=False
 ):
     """
@@ -244,6 +244,8 @@ def cal_frame_poses_lm(
         pred_pose_lst.append(np.identity(4)[:3, :])
     else:
         cls_voted_kps = pred_kp[:, cls_msk, :]
+        # for i in range(8):   
+        #     np.savetxt(str(i)+'_pred_kps_rgb.txt', cls_voted_kps[i,:,:].squeeze().cpu())
         ms = MeanShiftTorch(bandwidth=radius)
         ctr, ctr_labels = ms.fit(pred_ctr[cls_msk, :])
         if ctr_labels.sum() < 1:
@@ -261,7 +263,7 @@ def cal_frame_poses_lm(
         
         # visualize
         # if True:
-            
+        #     import pdb; pdb.set_trace()
         #     show_kp_img = np.zeros((480, 640, 3), np.uint8)
         #     kp_2ds = bs_utils_lm.project_p3d(
         #         cls_kps[cls_id].cpu().numpy(), 1000.0, K='linemod'
@@ -282,10 +284,11 @@ def cal_frame_poses_lm(
             cls_kps[cls_id].squeeze().contiguous().cpu().numpy()
         )
         pred_pose_lst.append(pred_RT)
-    return pred_pose_lst
+        
+    return pred_pose_lst, cls_kps[cls_id].squeeze().contiguous().cpu().numpy(), gt_kps[0].squeeze().contiguous().cpu().numpy(), gt_ctr[0].squeeze().contiguous().cpu().numpy()
 
 
-def eval_metric_lm(cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
+def eval_metric_lm(img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
     
     n_cls = config_lm.n_classes
     cls_add_dis = [list() for i in range(n_cls)]
@@ -295,11 +298,19 @@ def eval_metric_lm(cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
     pred_RT = torch.from_numpy(pred_RT.astype(np.float32)).cuda()
     gt_RT = RTs[0]
     mesh_pts = bs_utils_lm.get_pointxyz_cuda(obj_id, ds_type="linemod").clone()
+    
+    # Check points transformed by predicted pose and GT pose, projecting them to 2D images
+    # bs_utils_lm.draw_points(img_id, opt.wandb_name, obj_id, opt.linemod_cls, pred_RT, mesh_pts)
+    
+    # Save points transformed by predicted pose and GT pose  
+    # bs_utils_lm.save_points(img_id, opt.wandb_name, opt.linemod_cls, pred_RT, gt_RT, mesh_pts)
+    
     add = bs_utils_lm.cal_add_cuda(pred_RT, gt_RT, mesh_pts)
     adds = bs_utils_lm.cal_adds_cuda(pred_RT, gt_RT, mesh_pts)
     # print("obj_id:", obj_id, add, adds)
     # cls_add_dis[obj_id].append(add.item())
     # cls_adds_dis[obj_id].append(adds.item())
+    
     cls_add_dis[0].append(add.item())
     cls_adds_dis[0].append(adds.item())
 
@@ -310,17 +321,17 @@ def eval_one_frame_pose_lm(
     item
 ):
     
-    pcld, mask, ctr_of, pred_kp_of, RTs, cls_ids, use_ctr, n_cls, \
+    img_id, pcld, mask, ctr_of, pred_kp_of, gt_kp, gt_ctr, RTs, cls_ids, use_ctr, n_cls, \
         min_cnt, use_ctr_clus_flter, label, epoch, ibs, obj_id = item
-    pred_pose_lst = cal_frame_poses_lm(
-        pcld, mask, ctr_of, pred_kp_of, use_ctr, n_cls, use_ctr_clus_flter,
+    pred_pose_lst, pred_kp, gt_kp, gt_ctr = cal_frame_poses_lm(
+        pcld, mask, ctr_of, pred_kp_of, gt_kp, gt_ctr, use_ctr, n_cls, use_ctr_clus_flter,
         obj_id
     )
 
     cls_add_dis, cls_adds_dis = eval_metric_lm(
-        cls_ids, pred_pose_lst, RTs, mask, label, obj_id
+         img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id
     )
-    return (cls_add_dis, cls_adds_dis)
+    return (cls_add_dis, cls_adds_dis, pred_kp, gt_kp, gt_ctr)
 
 # ###############################End LineMOD Evaluation###############################
 
@@ -408,6 +419,7 @@ class TorchEval():
         pkl.dump(self.pred_id2pose_lst, open(sv_pth, 'wb'))
 
     def cal_lm_add(self, obj_id, test_occ=False):
+        
         add_auc_lst = []
         adds_auc_lst = []
         add_s_auc_lst = []
@@ -456,7 +468,7 @@ class TorchEval():
         pkl.dump(sv_info, open(sv_pth, 'wb'))
 
     def eval_pose_parallel(
-        self, pclds, rgbs, masks, pred_ctr_ofs, gt_ctr_ofs, labels, cnt,
+        self, pclds, img_id, rgbs, masks, pred_ctr_ofs, gt_ctr_ofs, labels, cnt,
         cls_ids, RTs, pred_kp_ofs, gt_kps, gt_ctrs, min_cnt=20, merge_clus=False,
         use_ctr_clus_flter=True, use_ctr=True, obj_id=0, kp_type='farthest',
         ds='ycb'
@@ -481,7 +493,7 @@ class TorchEval():
             )
         else:
             data_gen = zip(
-                pclds, masks, pred_ctr_ofs, pred_kp_ofs, RTs,
+                img_id, pclds, masks, pred_ctr_ofs, pred_kp_ofs, gt_kps, gt_ctrs, RTs,
                 cls_ids, use_ctr_lst, n_cls_lst, min_cnt_lst, use_ctr_clus_flter_lst,
                 labels, epoch_lst, bs_lst, obj_id_lst
             )
@@ -503,7 +515,7 @@ class TorchEval():
                         self.pred_kp_errs, pred_kp_errs
                     )
                 else:
-                    cls_add_dis_lst, cls_adds_dis_lst = res
+                    cls_add_dis_lst, cls_adds_dis_lst, pred_kp, gt_kp, gt_ctr = res
                 
                 self.cls_add_dis = self.merge_lst(
                     self.cls_add_dis, cls_add_dis_lst
@@ -511,6 +523,8 @@ class TorchEval():
                 self.cls_adds_dis = self.merge_lst(
                     self.cls_adds_dis, cls_adds_dis_lst
                 )
+        
+        return (cls_add_dis_lst[0][0], cls_adds_dis_lst[0][0], pred_kp, gt_kp, gt_ctr)
 
     def merge_lst(self, targ, src):
         

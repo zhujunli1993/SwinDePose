@@ -141,22 +141,26 @@ def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
         return None
 
 
-# def view_labels(rgb_chw, cld_cn, labels, K=config.intrinsic_matrix['linemod']):
-#     rgb_hwc = np.transpose(rgb_chw[0].numpy(), (1, 2, 0)).astype("uint8").copy()
-#     cld_nc = np.transpose(cld_cn.numpy(), (1, 0)).copy()
-#     p2ds = bs_utils.project_p3d(cld_nc, 1.0, K).astype(np.int32)
-#     labels = labels.squeeze().contiguous().cpu().numpy()
-#     colors = []
-#     h, w = rgb_hwc.shape[0], rgb_hwc.shape[1]
-#     rgb_hwc = np.zeros((h, w, 3), "uint8")
-#     for lb in labels:
-#         if int(lb) == 0:
-#             c = (0, 0, 0)
-#         else:
-#             c = color_lst[int(lb)]
-#         colors.append(c)
-#     show = bs_utils.draw_p2ds(rgb_hwc, p2ds, 3, colors)
-#     return show
+def view_labels(rgb_chw, img_id, obj_id, cld_cn, labels, K=config.intrinsic_matrix['linemod']):
+    
+    #rgb_hwc = np.transpose(rgb_chw[0].numpy(), (1, 2, 0)).astype("uint8").copy()
+    
+    rgb_hwc = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id)+'/rgb/'+img_id+'.png')
+    cld_nc = np.transpose(cld_cn.numpy(), (1, 0)).copy()
+    p2ds = bs_utils.project_p3d(cld_nc, 1.0, K).astype(np.int32)
+    labels = labels.squeeze().contiguous().cpu().numpy()
+    colors = []
+    #h, w = rgb_hwc.shape[0], rgb_hwc.shape[1]
+    #rgb_hwc = np.zeros((h, w, 3), "uint8")
+    for lb in labels:
+        if int(lb) == 0:
+            c = (255, 255, 255)
+        else:
+            c = color_lst[int(lb)]
+            #c = (0, 0, 0)
+        colors.append(c)
+    show = bs_utils.draw_p2ds(rgb_hwc, p2ds, 3, colors, 0.6)
+    return show
 
 
 def model_fn_decorator(
@@ -170,6 +174,7 @@ def model_fn_decorator(
     ):
         
         if finish_test:
+            # import pdb; pdb.set_trace()
             teval.cal_lm_add(config.cls_id)
             return None
         if is_eval:
@@ -188,7 +193,7 @@ def model_fn_decorator(
                     cu_dt[key] = data[key].long().cuda()
             
             end_points = model(cu_dt)
-
+            # import pdb; pdb.set_trace()
             labels = cu_dt['labels']
             loss_rgbd_seg = criterion(
                 end_points['pred_rgbd_segs'], labels.view(-1)
@@ -207,18 +212,22 @@ def model_fn_decorator(
 
             _, cls_rgbd = torch.max(end_points['pred_rgbd_segs'], 1)
             acc_rgbd = (cls_rgbd == labels).float().sum() / labels.numel()
-
-            # if args.debug:
+            
+            
+            # Check label predictions and GT.
+            # if True:
+                
+            #     img_id = cu_dt['img_id'].cpu().detach().numpy()
+            #     img_id = str(int(img_id)).zfill(4)
             #     show_lb = view_labels(
-            #         data['rgb'], data['cld_rgb_nrm'][0, :3, :], cls_rgbd
+            #         data['rgb'][:,0:3,:,:], img_id, 15, data['cld_rgb_nrm'][0, :3, :], cls_rgbd
             #     )
+            #     cv2.imwrite(os.path.join('/workspace/REPO/pose_estimation/ffb6d/train_log',opt.wandb_name,opt.linemod_cls,'eval_results/pred_lb_'+img_id+'_rgb.png'), show_lb)
             #     show_gt_lb = view_labels(
-            #         data['rgb'], data['cld_rgb_nrm'][0, :3, :],
+            #         data['rgb'][:,0:3,:,:], img_id, 15, data['cld_rgb_nrm'][0, :3, :],
             #         cu_dt['labels'].squeeze()
             #     )
-            #     imshow("pred_lb", show_lb)
-            #     imshow('gt_lb', show_gt_lb)
-            #     waitKey(0)
+            #     cv2.imwrite(os.path.join('/workspace/REPO/pose_estimation/ffb6d/train_log',opt.wandb_name,opt.linemod_cls,'eval_results/gt_lb_'+img_id+'_rgb.png'), show_gt_lb)
 
             loss_dict = {
                 'loss_rgbd_seg': loss_rgbd_seg.item(),
@@ -227,12 +236,13 @@ def model_fn_decorator(
                 'loss_all': loss.item(),
                 'loss_target': loss.item()
             }
+            
             acc_dict = {
                 'acc_rgbd': acc_rgbd.item(),
             }
             info_dict = loss_dict.copy()
             info_dict.update(acc_dict)
-
+            
             if not is_eval:
                 if opt.local_rank == 0:
                     wandb.log({"epoch": epoch,
@@ -244,29 +254,47 @@ def model_fn_decorator(
                 
                 if not opt.test_gt:
                     # eval pose from point cloud prediction.
-                    teval.eval_pose_parallel(
-                        cld, cu_dt['rgb'], cls_rgbd, end_points['pred_ctr_ofs'],
+                    add, adds = teval.eval_pose_parallel(
+                        cld, cu_dt['img_id'], cu_dt['rgb'], cls_rgbd, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],
                         cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
                         ds='linemod', obj_id=config.cls_id,
                         min_cnt=1, use_ctr_clus_flter=True, use_ctr=True,
                     )
+                # else:
+                #     # test GT labels, keypoint and center point offset
+                #     gt_ctr_ofs = cu_dt['ctr_targ_ofst'].unsqueeze(2).permute(0, 2, 1, 3)
+                #     gt_kp_ofs = cu_dt['kp_targ_ofst'].permute(0, 2, 1, 3)
+                #     add, adds = teval.eval_pose_parallel(
+                #         cld, cu_dt['img_id'], cu_dt['rgb'], labels, gt_ctr_ofs,
+                #         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
+                #         cu_dt['RTs'], gt_kp_ofs,
+                #         cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
+                #         ds='linemod', obj_id=config.cls_id,
+                #         min_cnt=1, use_ctr_clus_flter=True, use_ctr=True
+                #     )
                 else:
-                    # test GT labels, keypoint and center point offset
+                    # test GT labels 
                     gt_ctr_ofs = cu_dt['ctr_targ_ofst'].unsqueeze(2).permute(0, 2, 1, 3)
                     gt_kp_ofs = cu_dt['kp_targ_ofst'].permute(0, 2, 1, 3)
-                    teval.eval_pose_parallel(
-                        cld, cu_dt['rgb'], labels, gt_ctr_ofs,
+                    add, adds = teval.eval_pose_parallel(
+                        cld, cu_dt['img_id'], cu_dt['rgb'], labels, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
-                        cu_dt['RTs'], gt_kp_ofs,
+                        cu_dt['RTs'], end_points['pred_kp_ofs'],
                         cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
                         ds='linemod', obj_id=config.cls_id,
                         min_cnt=1, use_ctr_clus_flter=True, use_ctr=True
                     )
 
+            test_res = {
+                'img_id':cu_dt['img_id'].item(),
+                'add': add,
+                'adds':adds
+            }
+
         return (
-            end_points, loss, info_dict
+            end_points, loss, info_dict, test_res
         )
 
     return model_fn
@@ -319,18 +347,37 @@ class Trainer(object):
     def eval_epoch(self, d_loader, epoch,  is_test=False, test_pose=False):
         self.model.eval()
 
+        # 'loss_rgbd_seg': loss_rgbd_seg.item(),
+        #         'loss_kp_of': loss_kp_of.item(),
+        #         'loss_ctr_of': loss_ctr_of.item(),
+        #         'loss_all': loss.item(),
+        #         'loss_target': loss.item()
+        
         eval_dict = {}
         total_loss = 0.0
         count = 1
+        img_ids = []
+        loss_all = []
+        loss_kp = []
+        loss_seg = []
+        loss_ctr = []
+        add = []
+        adds = []
         for _, data in enumerate(d_loader):
-        
+            
             count += 1
             self.optimizer.zero_grad()
 
-            _, loss, eval_res = self.model_fn(
+            _, loss, eval_res, test_res = self.model_fn(
                 self.model, data, is_eval=True, is_test=is_test, test_pose=test_pose
             )
-
+            img_ids.append(test_res['img_id'])
+            loss_all.append(eval_res['loss_all'])
+            loss_kp.append(eval_res['loss_kp_of'])
+            loss_seg.append(eval_res['loss_rgbd_seg'])
+            loss_ctr.append(eval_res['loss_ctr_of'])
+            add.append(test_res['add'])
+            adds.append(test_res['adds'])
             if 'loss_target' in eval_res.keys():
                 total_loss += eval_res['loss_target']
             else:
@@ -338,7 +385,19 @@ class Trainer(object):
             for k, v in eval_res.items():
                 if v is not None:
                     eval_dict[k] = eval_dict.get(k, []) + [v]
-
+        
+            
+        test_results={
+            'img_ids':img_ids,
+            'loss_all':loss_all,
+            'loss_kp':loss_kp,
+            'loss_seg':loss_seg,
+            'loss_ctr':loss_ctr,
+            'add':add,
+            'adds':adds
+            
+        }
+        
         mean_eval_dict = {}
         acc_dict = {}
         for k, v in eval_res.items():
@@ -369,7 +428,7 @@ class Trainer(object):
                         "val_loss": total_loss / count})
             
             
-        return total_loss / count, eval_dict
+        return total_loss / count, eval_dict, test_results
 
     def train(
         self,
@@ -456,7 +515,7 @@ class Trainer(object):
                 
             
             if test_loader is not None:
-                val_loss, res = self.eval_epoch(test_loader, start_epoch)
+                val_loss, res, _ = self.eval_epoch(test_loader, start_epoch)
 
                 if val_loss < best_loss:
                     best_loss = val_loss
@@ -497,6 +556,7 @@ def train():
     )
 
     if not opt.eval_net:
+
         train_ds = dataset_desc.Dataset('train', cls_type=opt.linemod_cls)
         train_sampler = torch.utils.data.distributed.DistributedSampler(train_ds)
         train_loader = torch.utils.data.DataLoader(
@@ -599,11 +659,27 @@ def train():
 
     if opt.eval_net:
         start = time.time()
-        val_loss, res = trainer.eval_epoch(
+        val_loss, res, test_results = trainer.eval_epoch(
             test_loader, opt.n_total_epoch, is_test=True, test_pose=opt.test_pose
         )
         end = time.time()
         print("\nUse time: ", end - start, 's')
+        
+        # save test results
+        img_ids = test_results['img_ids']
+        loss_all = test_results['loss_all']
+        loss_kp = test_results['loss_kp']
+        loss_seg = test_results['loss_seg']
+        loss_ctr = test_results['loss_ctr']
+        add = test_results['add']
+        adds = test_results['adds']
+        np.savetxt(os.path.join(opt.log_eval_dir, 'img_ids.txt'),img_ids)
+        np.savetxt(os.path.join(opt.log_eval_dir, 'loss_all.txt'),loss_all)
+        np.savetxt(os.path.join(opt.log_eval_dir, 'loss_kp.txt'),loss_kp)
+        np.savetxt(os.path.join(opt.log_eval_dir, 'loss_seg.txt'),loss_seg)
+        np.savetxt(os.path.join(opt.log_eval_dir, 'loss_ctr.txt'),loss_ctr)
+        np.savetxt(os.path.join(opt.log_eval_dir, 'add.txt'),add)
+        np.savetxt(os.path.join(opt.log_eval_dir, 'adds.txt'),adds)
     else:
         trainer.train(
             it, start_epoch, opt.n_total_epoch, train_loader, None,

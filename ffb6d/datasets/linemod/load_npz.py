@@ -3,8 +3,8 @@ import cv2
 import matplotlib.pyplot as plt
 import os
 
-path = '/workspace/DATA/Linemod_preprocessed/data/15/pseudo_angles_signed/0000.npz'
-content = np.load(path)
+path = '/workspace/REPO/pose_estimation/ffb6d/train_log/lm_6_pseudo_noSyn_depth_RGB_mlp/phone/eval_results/test_res.npz'
+content = np.load(path,allow_pickle=True)
 import pdb; pdb.set_trace()
 angle=content['angles']
 sign=content['signed']

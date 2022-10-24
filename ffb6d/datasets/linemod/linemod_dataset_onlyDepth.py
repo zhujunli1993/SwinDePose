@@ -418,6 +418,7 @@ class Dataset():
         # )
 
         item_dict = dict(
+            img_id=np.uint8(item_name),
             rgb=rgb_c.astype(np.uint8),  # [c, h, w]
             cld_rgb_nrm=cld_rgb_nrm.astype(np.float32),  # [9, npts]
             choose=choose.astype(np.int32),  # [1, npts]

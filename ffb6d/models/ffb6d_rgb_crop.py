@@ -1,16 +1,14 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.cnn.pspnet_pseudo_depth_rgb import PSPNet
+from models.cnn.pspnet_rgb import PSPNet
 import models.pytorch_utils as pt_utils
 from models.RandLA.RandLANet import Network as RandLANet
-from config.options import BaseOptions
 
-opt = BaseOptions().parse()
 
 psp_models = {
     'resnet18': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='resnet18'),
-    'resnet34': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=opt.psp_size, deep_features_size=128, backend='resnet34'),
+    'resnet34': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='resnet34'),
     'resnet50': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet50'),
 }
 
@@ -26,21 +24,11 @@ class FFB6D(nn.Module):
         self.n_pts = n_pts
         self.n_kps = n_kps
         cnn = psp_models['resnet34'.lower()]()
-        
+
         rndla = RandLANet(rndla_cfg)
 
         self.cnn_pre_stages = nn.Sequential(
             cnn.feats.conv1,  # stride = 2, [bs, c, 240, 320]
-            cnn.feats.bn1, cnn.feats.relu,
-            cnn.feats.maxpool  # stride = 2, [bs, 64, 120, 160]
-        )
-        self.cnn_pre_stages_rgb_ori = nn.Sequential(
-            cnn.feats.conv1_rgb,  # stride = 2, [bs, c, 240, 320]
-            cnn.feats.bn1, cnn.feats.relu,
-            cnn.feats.maxpool  # stride = 2, [bs, 64, 120, 160]
-        )
-        self.cnn_pre_stages_depth = nn.Sequential(
-            cnn.feats.conv1_depth,  # stride = 2, [bs, c, 240, 320]
             cnn.feats.bn1, cnn.feats.relu,
             cnn.feats.maxpool  # stride = 2, [bs, 64, 120, 160]
         )
@@ -51,84 +39,20 @@ class FFB6D(nn.Module):
             cnn.feats.layer1,    # stride = 1, [bs, 64, 120, 160]
             cnn.feats.layer2,    # stride = 2, [bs, 128, 60, 80]
             # stride = 1, [bs, 128, 60, 80]
-            # nn.Sequential(cnn.feats.layer3, cnn.feats.layer4),
-            cnn.feats.layer3,
+            nn.Sequential(cnn.feats.layer3, cnn.feats.layer4),
             nn.Sequential(cnn.psp, cnn.drop_1)   # [bs, 1024, 60, 80]
         ])
-        # self.cnn_ds_stages_rgb_ori = nn.ModuleList([
-        #     cnn.feats.layer1,    # stride = 1, [bs, 64, 120, 160]
-        #     cnn.feats.layer2,    # stride = 2, [bs, 128, 60, 80]
-        #     # stride = 1, [bs, 128, 60, 80]
-        #     # nn.Sequential(cnn.feats.layer3, cnn.feats.layer4),
-        #     cnn.feats.layer3,
-        #     nn.Sequential(cnn.psp, cnn.drop_1)   # [bs, 1024, 60, 80]
-        # ])
-        self.ds_depth_oc = opt.ds_depth_oc #[64, 128, 256, 512]
-        self.ds_rgb_oc_ori = opt.ds_rgb_oc_ori
-        self.cnn_depth_ds_stages = nn.ModuleList()
-        self.cnn_ds_stages_rgb_ori = nn.ModuleList()
-        for i in range(4):
-            if i==0:
-                self.cnn_depth_ds_stages.append(pt_utils.Conv2d(
-                    self.ds_depth_oc[i], self.ds_depth_oc[i+1], stride=1, kernel_size=(1, 1),
-                    bn=True
-                ))
-                self.cnn_ds_stages_rgb_ori.append(pt_utils.Conv2d(
-                    self.ds_rgb_oc_ori[i], self.ds_rgb_oc_ori[i+1], stride=1, kernel_size=(1, 1),
-                    bn=True
-                ))
-            elif i==1:
-                self.cnn_depth_ds_stages.append(pt_utils.Conv2d(
-                self.ds_depth_oc[i], self.ds_depth_oc[i+1], stride=2, kernel_size=(1, 1),
-                bn=True
-                ))
-                self.cnn_ds_stages_rgb_ori.append(pt_utils.Conv2d(
-                self.ds_rgb_oc_ori[i], self.ds_rgb_oc_ori[i+1], stride=2, kernel_size=(1, 1),
-                bn=True
-                ))
-            elif i==2:
-                self.cnn_depth_ds_stages.append(pt_utils.Conv2d(
-                self.ds_depth_oc[i], self.ds_depth_oc[i+1], stride=1, kernel_size=(1, 1),
-                bn=True
-                ))
-                self.cnn_ds_stages_rgb_ori.append(pt_utils.Conv2d(
-                self.ds_rgb_oc_ori[i], self.ds_rgb_oc_ori[i+1], stride=1, kernel_size=(1, 1),
-                bn=True
-                ))
-            else:
-                self.cnn_depth_ds_stages.append(pt_utils.Conv2d(
-                self.ds_depth_oc[i], self.ds_depth_oc[i], stride=1, kernel_size=(1, 1),
-                bn=True
-                ))
-                self.cnn_ds_stages_rgb_ori.append(pt_utils.Conv2d(
-                self.ds_rgb_oc_ori[i], self.ds_rgb_oc_ori[i], stride=1, kernel_size=(1, 1),
-                bn=True
-                ))
         self.ds_sr = [4, 8, 8, 8]
 
         self.rndla_ds_stages = rndla.dilated_res_blocks
-        self.ds_rgb_ori_oc_fuse = opt.ds_rgb_ori_oc_fuse # [64, 128, 256, 512]
-        self.ds_rgb_oc = opt.ds_rgb_oc # [64, 128, 256, 512]
+
+        self.ds_rgb_oc = [64, 128, 512, 1024]
         self.ds_rndla_oc = [item * 2 for item in rndla_cfg.d_out]
         self.ds_fuse_r2p_pre_layers = nn.ModuleList()
         self.ds_fuse_r2p_fuse_layers = nn.ModuleList()
         self.ds_fuse_p2r_pre_layers = nn.ModuleList()
         self.ds_fuse_p2r_fuse_layers = nn.ModuleList()
-        # # Fuse the depth channel with the rgb features.
-        self.ds_fuse_fd_fuse_layers = nn.ModuleList()
-        # self.ds_fuse_dp_fuse_layers = nn.ModuleList()
-        # self.ds_fuse_d2f_pre_layers = nn.ModuleList()
-        # self.ds_fuse_d2f_fuse_layers = nn.ModuleList()
-        self.ds_depth_oc_fuse = opt.ds_depth_oc_fuse #[128, 256, 512, 512]
         for i in range(4):
-            
-            self.ds_fuse_fd_fuse_layers.append(
-                pt_utils.Conv2d(
-                    self.ds_rgb_oc[i]+self.ds_depth_oc_fuse[i]+self.ds_rgb_ori_oc_fuse[i], self.ds_rgb_oc[i], kernel_size=(1, 1),
-                    bn=True
-                )
-            )
-            
             self.ds_fuse_r2p_pre_layers.append(
                 pt_utils.Conv2d(
                     self.ds_rgb_oc[i], self.ds_rndla_oc[i], kernel_size=(1, 1),
@@ -154,12 +78,6 @@ class FFB6D(nn.Module):
                     bn=True
                 )
             )
-            # self.ds_fuse_dp_fuse_layers.append(
-            #     pt_utils.Conv2d(
-            #         self.ds_rndla_oc[i]+self.ds_depth_oc_fuse[i], self.ds_rndla_oc[i], kernel_size=(1, 1),
-            #         bn=True
-            #     )
-            # )
 
         # ###################### upsample stages #############################
         self.cnn_up_stages = nn.ModuleList([
@@ -168,49 +86,14 @@ class FFB6D(nn.Module):
             nn.Sequential(cnn.final),  # [bs, 64, 240, 320]
             nn.Sequential(cnn.up_3, cnn.final)  # [bs, 64, 480, 640]
         ])
-        self.up_rgb_oc = opt.up_rgb_oc # [256, 64, 64]
+        self.up_rgb_oc = [256, 64, 64]
         self.up_rndla_oc = []
         for j in range(rndla_cfg.num_layers):
             if j < 3:
                 self.up_rndla_oc.append(self.ds_rndla_oc[-j-2])
             else:
                 self.up_rndla_oc.append(self.ds_rndla_oc[0])
-        
-        self.up_depth_oc= opt.up_depth_oc #[512, 256, 64,64]
-        self.cnn_depth_up_stages = nn.ModuleList()
-        for i in range(2):
-            if i==0:
-                self.cnn_depth_up_stages.append(nn.Sequential(
-                nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
-                # F.interpolate(scale_factor=2, mode='bilinear', align_corners=True),
-                nn.Conv2d(self.up_depth_oc[i], self.up_depth_oc[i+1], 3, padding=1),
-                nn.BatchNorm2d(self.up_depth_oc[i+1]),
-                nn.PReLU()
-                ))
-            else:
-                self.cnn_depth_up_stages.append(nn.Sequential(
-                nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
-                # F.interpolate(scale_factor=2, mode='bilinear', align_corners=True),
-                nn.Conv2d(self.up_depth_oc[i], self.up_depth_oc[i+1], 3, padding=1),
-                nn.BatchNorm2d(self.up_depth_oc[i+1]),
-                nn.PReLU()
-                ))
-            # else:
-            #     self.cnn_depth_up_stages.append(nn.Sequential(
-            #     nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
-            #     # F.interpolate(scale_factor=2, mode='bilinear', align_corners=True),
-            #     nn.Conv2d(self.up_depth_oc[i], self.up_depth_oc[i], 3, padding=1),
-            #     nn.BatchNorm2d(self.up_depth_oc[i]),
-            #     nn.PReLU()
-            #     ))
-            # else:
-            #     self.cnn_depth_up_stages.append(nn.Sequential(
-            #     nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True),
-            #     # F.interpolate(scale_factor=2, mode='bilinear', align_corners=True),
-            #     nn.Conv2d(self.up_depth_oc[i], self.up_depth_oc[i], 3, padding=1),
-            #     nn.BatchNorm2d(self.up_depth_oc[i]),
-            #     nn.PReLU()
-            #     ))
+
         self.rndla_up_stages = rndla.decoder_blocks
 
         n_fuse_layer = 3
@@ -218,14 +101,7 @@ class FFB6D(nn.Module):
         self.up_fuse_r2p_fuse_layers = nn.ModuleList()
         self.up_fuse_p2r_pre_layers = nn.ModuleList()
         self.up_fuse_p2r_fuse_layers = nn.ModuleList()
-        self.up_fuse_fd_fuse_layers = nn.ModuleList()
         for i in range(n_fuse_layer):
-            self.up_fuse_fd_fuse_layers.append(
-                pt_utils.Conv2d(
-                    self.up_rgb_oc[i]+self.up_depth_oc[i+1], self.up_rgb_oc[i], kernel_size=(1, 1),
-                    bn=True
-                )
-            )
             self.up_fuse_r2p_pre_layers.append(
                 pt_utils.Conv2d(
                     self.up_rgb_oc[i], self.up_rndla_oc[i], kernel_size=(1, 1),
@@ -331,8 +207,6 @@ class FFB6D(nn.Module):
         Params:
         inputs: dict of :
             rgb         : FloatTensor [bs, 3, h, w]
-            # angles      : FloatTensor [bs, 3, h, w]
-            # sign_angles : FloatTensor [bs, 3, h, w]
             dpt_nrm     : FloatTensor [bs, 6, h, w], 3c xyz in meter + 3c normal map
             cld_rgb_nrm : FloatTensor [bs, 9, npts]
             choose      : LongTensor [bs, 1, npts]
@@ -345,12 +219,12 @@ class FFB6D(nn.Module):
         if not end_points:
             end_points = {}
         # ResNet pre + layer1 + layer2
-        
-        # Dirctly concat pseudo-rgb and depth together
-        # rgb_emb = self.cnn_pre_stages(torch.cat((inputs['rgb'],inputs['depth'].unsqueeze(dim=1)),dim=1))  
-        rgb_ori_emb0 = self.cnn_pre_stages_rgb_ori(inputs['rgb_ori'])
-        rgb_emb = self.cnn_pre_stages(inputs['rgb']) 
-        depth_emb0 = self.cnn_pre_stages_depth(inputs['depth'].unsqueeze(dim=1)) 
+        # angles_emb = self.cnn_pre_stages(inputs['angles']) # stride = 2, [bs, c, 240, 320]
+        # sign_angles_emb = self.cnn_pre_stages(inputs['sign_angles']) # stride = 2, [bs, c, 240, 320]
+        # rgb_emb = angles_emb + sign_angles_emb
+
+        rgb_emb = self.cnn_pre_stages(inputs['rgb'])  
+
         # rndla pre
         # xyz, p_emb = self._break_up_pc(inputs['cld_rgb_nrm'])
         p_emb = inputs['cld_rgb_nrm'] # cld, rgb_c_pt, nrm_pt: selected points
@@ -361,16 +235,8 @@ class FFB6D(nn.Module):
         ds_emb = []
         
         for i_ds in range(4):
-            
             # encode rgb downsampled feature
             rgb_emb0 = self.cnn_ds_stages[i_ds](rgb_emb)
-            # encode depth downsampled feature
-            depth_emb0 = self.cnn_depth_ds_stages[i_ds](depth_emb0)
-            # encode rgb downsampled feature
-            rgb_ori_emb0 = self.cnn_ds_stages_rgb_ori[i_ds](rgb_ori_emb0)
-            # Concat rgb_emb with depth_emb
-            rgb_emb0 = self.ds_fuse_fd_fuse_layers[i_ds](torch.cat((rgb_emb0,depth_emb0,rgb_ori_emb0),dim=1))
-            
             bs, c, hr, wr = rgb_emb0.size()
 
             # encode point cloud downsampled feature
@@ -390,8 +256,7 @@ class FFB6D(nn.Module):
             rgb_emb = self.ds_fuse_p2r_fuse_layers[i_ds](
                 torch.cat((rgb_emb0, p2r_emb), dim=1)
             )
-            
-            
+
             # fuse rgb feature to point feature
             r2p_emb = self.random_sample(
                 rgb_emb0.reshape(bs, c, hr*wr, 1), inputs['r2p_ds_nei_idx%d' % i_ds]
@@ -405,16 +270,8 @@ class FFB6D(nn.Module):
         # ###################### decoding stages #############################
         n_up_layers = len(self.rndla_up_stages)
         for i_up in range(n_up_layers-1):
-            
             # decode rgb upsampled feature
             rgb_emb0 = self.cnn_up_stages[i_up](rgb_emb)
-            # encode depth upsampled feature
-            if not i_up==2:
-                depth_emb0 = self.cnn_depth_up_stages[i_up](depth_emb0)
-            else:
-                depth_emb0=depth_emb0
-            # Concat rgb_emb with depth_emb
-            rgb_emb0 = self.up_fuse_fd_fuse_layers[i_up](torch.cat((rgb_emb0,depth_emb0),dim=1))
             bs, c, hr, wr = rgb_emb0.size()
 
             # decode point cloud upsampled feature
@@ -512,3 +369,4 @@ class DenseFusion(nn.Module):
 
         ap_x = ap_x.view(-1, 1024, 1).repeat(1, 1, n_pts)
         return torch.cat([feat_1, feat_2, ap_x], 1)  # 96+ 512 + 1024 = 1632
+

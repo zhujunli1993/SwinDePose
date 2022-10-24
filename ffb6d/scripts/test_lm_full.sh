@@ -15,7 +15,7 @@ python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 400
     --num_threads 0 \
     --dataset_name 'linemod' \
     --data_root '/workspace/DATA/Linemod_preprocessed' \
-    --train_list 'train.txt' --test_list 'test.txt' \
+    --train_list 'train.txt' --test_list 'test_short.txt' \
     --linemod_cls=$CLS --full \
     --load_checkpoint $tst_mdl \
     --test --test_pose --eval_net \

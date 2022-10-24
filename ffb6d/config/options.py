@@ -16,8 +16,8 @@ class BaseOptions():
                                             duck,eggbox, glue, holepuncher, iron, lamp, phone')
         g_data.add_argument('--syn', action='store_true', help='Generate YCBV synthetic pseudo images')
         g_data.add_argument('--real', action='store_true', help='Generate YCBV real pseudo images')
-        g_data.add_argument('--width', type=int, default=640, help='YCBV image width')
-        g_data.add_argument('--height', type=int, default=480, help='YCBV image height')
+        g_data.add_argument('--width', type=int, default=640, help='YCBV image width, default = 640')
+        g_data.add_argument('--height', type=int, default=480, help='YCBV image height, default = 480')
         g_data.add_argument('--data_root', type=str, help='Dataset Location.')
         g_data.add_argument('--rm_outline', action='store_true', help='Remove points with too small depth value from depth image.')
         g_data.add_argument('--angles_gen', type=str,  help='The C++ codes directory for generating XYZ angles and signed angles file.')
@@ -31,7 +31,7 @@ class BaseOptions():
         g_exp.add_argument('--exp_dir', type=str, default='/workspace/REPO/pose_estimation', help='code directory')
         g_exp.add_argument('--wandb_proj', type=str, help='wandb project name')
         g_exp.add_argument('--wandb_name', type=str, help='wandb run name')
-        g_exp.add_argument('--gpu_id', type=int, default=0, help='gpu id for cuda')
+        g_exp.add_argument('--gpu_id', type=list, default=[0], help='gpu id for cuda')
         g_exp.add_argument('--num_threads', default=4, type=int, help='# sthreads for loading data')
         g_exp.add_argument('--serial_batches', action='store_true', help='if true, takes images in order to make batches, otherwise takes them randomly')
         g_exp.add_argument('--pin_memory', action='store_true', help='pin_memory')
@@ -66,7 +66,9 @@ class BaseOptions():
         g_train.add_argument('--decay_step', type=float, default=2e5,help="Learning rate decay step [default: 20]")
         g_train.add_argument('--bn_momentum', type=float, default=0.9,help="Initial batch norm momentum [default: 0.9]")
         g_train.add_argument('--bn_decay', type=float, default=0.5,help="Batch norm momentum decay gamma [default: 0.5]")
-        
+        g_train.add_argument('--crop', action='store_true', help='using cropped image as input.')
+        g_train.add_argument('--max_w', type=int, default=200, help='max width for cropping')
+        g_train.add_argument('--max_h', type=int, default=200, help='max height for cropping')
         # for eval
         parser.add_argument('--val_test_error', action='store_true', help='validate errors of test data')
         parser.add_argument('--eval_net', action='store_true', help="whether is to eval net.")
@@ -111,6 +113,7 @@ class BaseOptions():
         # g_model.add_argument('--num_sub_points', nargs='+', default=[480 * 640 // 24 // 4, 480 * 640 // 24 // 16, 480 * 640 // 24 // 64, 480 * 640 // 24 // 256],  
         #                      help='num_points // 4, num_points // 16, num_points // 64, num_points // 256')        
         g_model.add_argument('--psp_out', default=512, type=int, help='last layer dim of psp downsampling.')
+        g_model.add_argument('--deep_features_size', default=128, type=int, help='deep feature for pspnet.')
         g_model.add_argument('--psp_size', default=256, type=int, help='psp size for psp layer initial, maybe equal to the last second emb_length of ds_rgb_oc.')
         g_model.add_argument('--ds_depth_oc',nargs='+', default=[64, 128, 256, 512], type=int, help='depth image emb length for downsampling.')
         g_model.add_argument('--ds_rgb_oc',nargs='+', default=[64, 128, 256, 512], type=int, help='pseudo image emb length.')

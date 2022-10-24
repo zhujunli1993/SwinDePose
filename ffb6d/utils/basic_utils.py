@@ -281,7 +281,11 @@ class Basic_Utils():
         if not os.path.exists(pth):
             os.system("mkdir -p %s" % pth)
 
-    def draw_p2ds(self, img, p2ds, r=1, color=[(255, 0, 0)]):
+    def draw_p2ds(self, img, p2ds, r=1, color=[(255, 0, 0)],alpha=0.4):
+        # alpha = 0.4  # Transparency factor.
+        # pick every 10 points
+        # p2ds = p2ds[::10, :]
+        overlay = img.copy()
         if type(color) == tuple:
             color = [color]
         if len(color) != p2ds.shape[0]:
@@ -290,10 +294,18 @@ class Basic_Utils():
         for pt_2d, c in zip(p2ds, color):
             pt_2d[0] = np.clip(pt_2d[0], 0, w)
             pt_2d[1] = np.clip(pt_2d[1], 0, h)
-            img = cv2.circle(
-                img, (pt_2d[0], pt_2d[1]), r, c, -1
+            # img = cv2.circle(
+            #     img, (pt_2d[0], pt_2d[1]), r, c, -1
+            # )
+            cv2.circle(
+                overlay, (pt_2d[0], pt_2d[1]), r, c, -1
             )
-        return img
+            # alpha = 0.4  # Transparency factor.
+            # # Following line overlays transparent rectangle over the image
+            # img = cv2.addWeighted(img, alpha, img, 1 - alpha, 0)
+        image_new = cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0)
+        #return img
+        return image_new
 
     def paste_p2ds(self, img, p2ds, color=[(255, 0, 0)]):
         if type(color) == tuple:
@@ -639,7 +651,32 @@ class Basic_Utils():
             ctr = cors.mean(0)
             self.lm_cls_ctr_dict[cls] = ctr
         return ctr.copy()
+    def draw_points(self, img_id, folder_name, obj_id, obj_name, pred_RT, p3ds):
 
+        img_id = img_id.cpu().detach().numpy()
+        img_id = str(int(img_id)).zfill(4)
+        pred_p3ds = torch.mm(p3ds, pred_RT[:, :3].transpose(1, 0)) + pred_RT[:, 3]
+        # for cropping image
+        # show_kp_img = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id)+'/crop_rgb/'+img_id+'.png')
+        show_kp_img = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id)+'/rgb/'+img_id+'.png')
+        pred_2ds = self.project_p3d(
+            pred_p3ds.cpu().numpy(), 1000.0, K='linemod'
+        )
+        color = (0, 0, 255)  # bs_utils.get_label_color(cls_id.item())
+        show_kp_img = self.draw_p2ds(show_kp_img, pred_2ds, r=3, color=color)
+        # imshow("kp: cls_id=%d" % cls_id, show_kp_img)
+        cv2.imwrite('/workspace/REPO/pose_estimation/ffb6d/train_log/'+folder_name+'/'+obj_name+'/eval_results/'+img_id+'.png', show_kp_img)
+    def save_points(self, img_id, folder_name, obj_name, pred_RT, gt_RT, p3ds):
+        img_id = img_id.cpu().detach().numpy()
+        img_id = str(int(img_id)).zfill(4)
+        pred_p3ds = torch.mm(p3ds, pred_RT[:, :3].transpose(1, 0)) + pred_RT[:, 3]
+        gt_p3ds = torch.mm(p3ds, gt_RT[:, :3].transpose(1, 0)) + gt_RT[:, 3]
+        
+        pred_p3ds = pred_p3ds.cpu().detach().numpy()
+        gt_p3ds = gt_p3ds.cpu().detach().numpy()
+    
+        np.savetxt('/workspace/REPO/pose_estimation/ffb6d/train_log/'+folder_name+'/'+obj_name+'/eval_results_gt/'+img_id+'_pred.txt', pred_p3ds)
+        np.savetxt('/workspace/REPO/pose_estimation/ffb6d/train_log/'+folder_name+'/'+obj_name+'/eval_results_gt/'+img_id+'_gt.txt', gt_p3ds)
     def cal_auc(self, add_dis, max_dis=0.1):
         D = np.array(add_dis)
         D[np.where(D > max_dis)] = np.inf
@@ -654,6 +691,7 @@ class Basic_Utils():
     ):
         pred_p3ds = torch.mm(p3ds, pred_RT[:, :3].transpose(1, 0)) + pred_RT[:, 3]
         gt_p3ds = torch.mm(p3ds, gt_RT[:, :3].transpose(1, 0)) + gt_RT[:, 3]
+        
         dis = torch.norm(pred_p3ds - gt_p3ds, dim=1)
         return torch.mean(dis)
 

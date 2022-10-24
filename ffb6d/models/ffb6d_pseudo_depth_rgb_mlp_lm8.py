@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.cnn.pspnet_pseudo_depth_rgb import PSPNet
+from models.cnn.pspnet_pseudo_depth_rgb_crop_lm8 import PSPNet
 import models.pytorch_utils as pt_utils
 from models.RandLA.RandLANet import Network as RandLANet
 from config.options import BaseOptions
@@ -404,8 +404,7 @@ class FFB6D(nn.Module):
 
         # ###################### decoding stages #############################
         n_up_layers = len(self.rndla_up_stages)
-        for i_up in range(n_up_layers-1):
-            
+        for i_up in range(n_up_layers-1):    
             # decode rgb upsampled feature
             rgb_emb0 = self.cnn_up_stages[i_up](rgb_emb)
             # encode depth upsampled feature
