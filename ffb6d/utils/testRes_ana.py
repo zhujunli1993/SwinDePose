@@ -32,33 +32,33 @@ def get_loss(name):
 # cld = np.load('/workspace/REPO/pose_estimation/ffb6d/train_log/lm_6_pseudo_noSyn_depth_RGB_mlp/phone/eval_results/cld.npy')    
 
    
-loss_all, loss_ctr, loss_kp, loss_seg, add, adds, pred_kp, gt_kp, gt_ctr, path = get_loss('lm_5_pseudo_noSyn_addDepth_attention')
-loss_all_1, loss_ctr_1, loss_kp_1, loss_seg_1, add_1, adds_1,pred_kp_1, gt_kp_1, gt_ctr_1, path_1 = get_loss('lm_6_pseudo_noSyn_depth_RGB_mlp')
+loss_all, loss_ctr, loss_kp, loss_seg, add, adds, pred_kp, gt_kp, gt_ctr, path = get_loss('lm_11_pseudo_depth_mlp')
+loss_all_1, loss_ctr_1, loss_kp_1, loss_seg_1, add_1, adds_1,pred_kp_1, gt_kp_1, gt_ctr_1, path_1 = get_loss('lm_9_pseudo_noSyn_depth_RGB_mlp')
 
-
-img_ids = np.arange(0,len(loss_all))
+import pdb;pdb.set_trace()
+# img_ids = np.arange(0,len(loss_all))
 
 # ### Draw loss histograms
 # fig, ax = plt.subplots(2,2)
 # n_bins = 15
 
-# ax[0,0].hist(loss_all, n_bins, alpha=0.5, density=True, label='lm_5')    
-# ax[0,0].hist(loss_all_1, n_bins, alpha=0.5, density=True, label='lm_6') 
+# ax[0,0].hist(loss_all, n_bins, alpha=0.5, density=True, label='lm_11')    
+# ax[0,0].hist(loss_all_1, n_bins, alpha=0.5, density=True, label='lm_9') 
 # ax[0,0].title.set_text('loss_all')
 # ax[0,0].legend(loc='upper right')
 
-# ax[0,1].hist(loss_ctr, n_bins, alpha=0.5, density=True, label='lm_5')    
-# ax[0,1].hist(loss_ctr_1, n_bins, alpha=0.5, density=True, label='lm_6')
+# ax[0,1].hist(loss_ctr, n_bins, alpha=0.5, density=True, label='lm_11')    
+# ax[0,1].hist(loss_ctr_1, n_bins, alpha=0.5, density=True, label='lm_9')
 # ax[0,1].title.set_text('loss_ctr')
 # ax[0,1].legend(loc='upper right')
 
-# ax[1,0].hist(loss_kp, n_bins, alpha=0.5, density=True, label='lm_5')  
-# ax[1,0].hist(loss_kp_1, n_bins, alpha=0.5, density=True, label='lm_6')  
+# ax[1,0].hist(loss_kp, n_bins, alpha=0.5, density=True, label='lm_11')  
+# ax[1,0].hist(loss_kp_1, n_bins, alpha=0.5, density=True, label='lm_9')  
 # ax[1,0].title.set_text('loss_kp')
 # ax[1,0].legend(loc='upper right')
 
-# ax[1,1].hist(loss_seg, n_bins, alpha=0.5, density=True, label='lm_5')    
-# ax[1,1].hist(loss_seg_1, n_bins, alpha=0.5, density=True, label='lm_6')  
+# ax[1,1].hist(loss_seg, n_bins, alpha=0.5, density=True, label='lm_11')    
+# ax[1,1].hist(loss_seg_1, n_bins, alpha=0.5, density=True, label='lm_9')  
 # ax[1,1].title.set_text('loss_seg')
 # ax[1,1].legend(loc='upper right')
 
@@ -73,13 +73,13 @@ img_ids = np.arange(0,len(loss_all))
 # fig, ax = plt.subplots(1,2)
 # n_bins = 15
 
-# ax[0].hist(add, n_bins, alpha=0.5, density=True, label='lm_5')    
-# ax[0].hist(add_1, n_bins, alpha=0.5, density=True, label='lm_6') 
+# ax[0].hist(add, n_bins, alpha=0.5, density=True, label='lm_11')    
+# ax[0].hist(add_1, n_bins, alpha=0.5, density=True, label='lm_9') 
 # ax[0].title.set_text('add')
 # ax[0].legend(loc='right')
 
-# ax[1].hist(adds, n_bins, alpha=0.5, density=True, label='lm_5')    
-# ax[1].hist(adds_1, n_bins, alpha=0.5, density=True, label='lm_6')
+# ax[1].hist(adds, n_bins, alpha=0.5, density=True, label='lm_11')    
+# ax[1].hist(adds_1, n_bins, alpha=0.5, density=True, label='lm_9')
 # ax[1].title.set_text('adds')
 # ax[1].legend(loc='right')
 
@@ -158,17 +158,17 @@ img_ids = np.arange(0,len(loss_all))
 # plt.savefig(sca_fig)
 # plt.clf()
 
-### Process predicted kp vs gt kp and gt ctr.
-gt_ctr = np.expand_dims(gt_ctr, axis=1)
-kp_ctr = np.concatenate((gt_kp, gt_ctr), axis=1)
-gt_ctr_1 = np.expand_dims(gt_ctr_1, axis=1)
-kp_ctr_1 = np.concatenate((gt_kp_1, gt_ctr_1), axis=1)
+# ### Process predicted kp vs gt kp and gt ctr.
+# gt_ctr = np.expand_dims(gt_ctr, axis=1)
+# kp_ctr = np.concatenate((gt_kp, gt_ctr), axis=1)
+# gt_ctr_1 = np.expand_dims(gt_ctr_1, axis=1)
+# kp_ctr_1 = np.concatenate((gt_kp_1, gt_ctr_1), axis=1)
 
-dist = pred_kp - kp_ctr
-dist_1 = pred_kp_1 - kp_ctr_1
+# dist = pred_kp - kp_ctr
+# dist_1 = pred_kp_1 - kp_ctr_1
 
-norm = np.linalg.norm(dist, axis=-1)
-norm_1 = np.linalg.norm(dist_1, axis=-1)
+# norm = np.linalg.norm(dist, axis=-1)
+# norm_1 = np.linalg.norm(dist_1, axis=-1)
 
 # ### Draw histogram of dist
 # fig, ax = plt.subplots(3,3)
@@ -192,27 +192,27 @@ norm_1 = np.linalg.norm(dist_1, axis=-1)
 
 
 
-### Draw each keypoint and centroid distance(from predicted to gt) VS add scatter correlation
-fig, ax = plt.subplots(3,3)
-ind = 0
-for i in range(3):
-    for j in range(3):
-        ax[i][j].scatter(norm[:,ind], add, alpha=0.2, label='lm_5')
-        ax[i][j].scatter(norm_1[:,ind], add_1, alpha=0.2, label='lm_6')
-        #ax[i][j].legend(loc='upper left')
-        if i==2 and j==2:
-            ax[i][j].set_title('centroid'+' - add',fontsize=6)
-        else: 
-            ax[i][j].set_title('dist(keypoint_'+str(ind)+') - add',fontsize=6)
-        ax[i][j].legend(loc='upper left',prop={'size': 6})
-        ax[i][j].set_xlabel('dist',fontsize=6)
-        ax[i][j].set_ylabel('add',fontsize=6)
-        ind+=1
+# ### Draw each keypoint and centroid distance(from predicted to gt) VS add scatter correlation
+# fig, ax = plt.subplots(3,3)
+# ind = 0
+# for i in range(3):
+#     for j in range(3):
+#         ax[i][j].scatter(norm[:,ind], add, alpha=0.2, label='lm_5')
+#         ax[i][j].scatter(norm_1[:,ind], add_1, alpha=0.2, label='lm_6')
+#         #ax[i][j].legend(loc='upper left')
+#         if i==2 and j==2:
+#             ax[i][j].set_title('centroid'+' - add',fontsize=6)
+#         else: 
+#             ax[i][j].set_title('dist(keypoint_'+str(ind)+') - add',fontsize=6)
+#         ax[i][j].legend(loc='upper left',prop={'size': 6})
+#         ax[i][j].set_xlabel('dist',fontsize=6)
+#         ax[i][j].set_ylabel('add',fontsize=6)
+#         ind+=1
 
-fig.tight_layout()
-dist_fig = os.path.join(path, 'dist_add_onlyMask.png')
-plt.savefig(dist_fig)
-plt.clf()
+# fig.tight_layout()
+# dist_fig = os.path.join(path, 'dist_add_onlyMask.png')
+# plt.savefig(dist_fig)
+# plt.clf()
 
 
 ### Draw each keypoint and centroid distance(from predicted to gt) VS loss_all scatter correlation
