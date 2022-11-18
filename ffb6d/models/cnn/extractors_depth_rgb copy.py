@@ -121,26 +121,15 @@ class ResNet(nn.Module):
         self.current_dilation = 1
         self.remove_avg_pool_layer = remove_avg_pool_layer
 
-        self.inplanes = [64, 64, 128, 256]
+        self.inplanes = [64, 128, 128, 256]
         self.fully_conv = fully_conv
         super(ResNet, self).__init__()
+
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+        self.conv1_depth = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
         
-        
-        if not opt.depth_split:
-            self.conv1 = nn.Conv2d(7, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-        else:
-            self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-            self.conv1_depth = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-        if opt.add_rgb:
-            self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-            self.conv1_depth = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-            self.conv1_rgb = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
             
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)

@@ -130,17 +130,11 @@ class ResNet(nn.Module):
             self.conv1 = nn.Conv2d(7, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
         else:
-            self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
+            self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
             self.conv1_depth = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
                                bias=False)
-        if opt.add_rgb:
-            self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-            self.conv1_depth = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-            self.conv1_rgb = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
+        
             
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)

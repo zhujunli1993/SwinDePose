@@ -6,9 +6,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
 from config.options import BaseOptions
-
+from config.common import Config
 opt = BaseOptions().parse()
-
+if opt.dataset_name=='ycb':
+    config = Config(ds_name='ycb')
+else:   
+    config = Config(ds_name=opt.dataset_name, cls_type=opt.linemod_cls)
 
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
@@ -121,35 +124,30 @@ class ResNet(nn.Module):
         self.current_dilation = 1
         self.remove_avg_pool_layer = remove_avg_pool_layer
 
-        self.inplanes = [64, 64, 128, 256]
+        self.inplanes = 64
         self.fully_conv = fully_conv
         super(ResNet, self).__init__()
         
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
+                               bias=False)
+        # if opt.add_depth and not opt.depth_split:
+        #     self.conv1 = nn.Conv2d(7, 64, kernel_size=7, stride=2, padding=3,
+        #                        bias=False)
+        # if opt.add_depth and opt.depth_split:
+        #     self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
+        #                        bias=False)
+        #     self.conv1_depth = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
+        #                        bias=False)
         
-        if not opt.depth_split:
-            self.conv1 = nn.Conv2d(7, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-        else:
-            self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-            self.conv1_depth = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-        if opt.add_rgb:
-            self.conv1 = nn.Conv2d(6, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-            self.conv1_depth = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
-            self.conv1_rgb = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
             
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
-        self.layer1 = self._make_layer(block, opt.ds_rgb_oc[0], layers[0], layer=1)
-        self.layer2 = self._make_layer(block, opt.ds_rgb_oc[1], layers[1], layer=2, stride=2)
-        self.layer3 = self._make_layer(block, opt.ds_rgb_oc[2], layers[2], layer=3, stride=1, dilation=2)
-        self.layer4 = self._make_layer(block, opt.ds_rgb_oc[3], layers[3], layer=4, stride=1, dilation=4)
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=1, dilation=2)
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=4)
 
         self.avgpool = nn.AvgPool2d(7)
 
@@ -166,10 +164,9 @@ class ResNet(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
-    def _make_layer(self, block, planes, blocks, layer, stride=1, dilation=1):
-        
+    def _make_layer(self, block, planes, blocks, stride=1, dilation=1):
         downsample = None
-        if stride != 1 or self.inplanes[layer-1] != planes * block.expansion:
+        if stride != 1 or self.inplanes != planes * block.expansion:
             # Check if we already achieved desired output stride.
             if self.current_stride == self.output_stride:
                 # If so, replace subsampling with a dilation to preserve
@@ -183,20 +180,18 @@ class ResNet(nn.Module):
 
             # We don't dilate 1x1 convolution.
             downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes[layer-1], planes * block.expansion,
+                nn.Conv2d(self.inplanes, planes * block.expansion,
                           kernel_size=1, stride=stride, bias=False),
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
         layers = []
-        
-        layers.append(block(self.inplanes[layer-1], planes, stride, downsample, dilation=self.current_dilation))
-        self.inplanes[layer-1] = planes * block.expansion
+        layers.append(block(self.inplanes, planes, stride, downsample, dilation=self.current_dilation))
+        self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes[layer-1], planes, dilation=self.current_dilation))
+            layers.append(block(self.inplanes, planes, dilation=self.current_dilation))
 
         return nn.Sequential(*layers)
-
 
     def forward(self, x):
         
