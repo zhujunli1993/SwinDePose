@@ -23,7 +23,6 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import CyclicLR
 import torch.backends.cudnn as cudnn
-
 import wandb
 
 from config.options import BaseOptions
@@ -196,13 +195,19 @@ def model_fn_decorator(
             labels = cu_dt['labels']
             loss_rgbd_seg = criterion(
                 end_points['pred_rgbd_segs'], labels.view(-1)
-            ).sum()
+            )
+            
             loss_kp_of = criterion_of(
                 end_points['pred_kp_ofs'], cu_dt['kp_targ_ofst'], labels
-            ).sum()
+            )
+            
             loss_ctr_of = criterion_of(
                 end_points['pred_ctr_ofs'], cu_dt['ctr_targ_ofst'], labels
-            ).sum()
+            )
+            
+            loss_of = torch.cat((loss_kp_of, loss_ctr_of),1).mean(0)
+            loss_kp_of = loss_of[:8].mean()
+            loss_ctr_of = loss_of[-1]
 
             loss_lst = [
                 (loss_rgbd_seg, 2.0), (loss_kp_of, 1.0), (loss_ctr_of, 1.0),
@@ -254,7 +259,7 @@ def model_fn_decorator(
                 
                 if not opt.test_gt:
                     # eval pose from point cloud prediction.
-                    add, adds,_,_ = teval.eval_pose_parallel(
+                    add, adds, pred_kp, gt_kp, gt_ctr = teval.eval_pose_parallel(
                         cld, cu_dt['img_id'], cu_dt['rgb'], cls_rgbd, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],

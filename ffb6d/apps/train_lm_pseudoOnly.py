@@ -193,17 +193,23 @@ def model_fn_decorator(
                     cu_dt[key] = data[key].long().cuda()
             
             end_points = model(cu_dt)
-            # import pdb; pdb.set_trace()
+            
             labels = cu_dt['labels']
             loss_rgbd_seg = criterion(
                 end_points['pred_rgbd_segs'], labels.view(-1)
-            ).sum()
+            )
+            
             loss_kp_of = criterion_of(
                 end_points['pred_kp_ofs'], cu_dt['kp_targ_ofst'], labels
-            ).sum()
+            )
+            
             loss_ctr_of = criterion_of(
                 end_points['pred_ctr_ofs'], cu_dt['ctr_targ_ofst'], labels
-            ).sum()
+            )
+            
+            loss_of = torch.cat((loss_kp_of, loss_ctr_of),1).mean(0)
+            loss_kp_of = loss_of[:8].mean()
+            loss_ctr_of = loss_of[-1]
 
             loss_lst = [
                 (loss_rgbd_seg, 2.0), (loss_kp_of, 1.0), (loss_ctr_of, 1.0),
@@ -213,8 +219,7 @@ def model_fn_decorator(
             _, cls_rgbd = torch.max(end_points['pred_rgbd_segs'], 1)
             acc_rgbd = (cls_rgbd == labels).float().sum() / labels.numel()
             
-            
-            # Check label predictions and GT.
+            # Check label predictions and GT. 
             # if True:
                 
             #     img_id = cu_dt['img_id'].cpu().detach().numpy()
@@ -228,6 +233,8 @@ def model_fn_decorator(
             #         cu_dt['labels'].squeeze()
             #     )
             #     cv2.imwrite(os.path.join('/workspace/REPO/pose_estimation/ffb6d/train_log',opt.wandb_name,opt.linemod_cls,'eval_results/gt_lb_'+img_id+'_rgb.png'), show_gt_lb)
+
+                
 
             loss_dict = {
                 'loss_rgbd_seg': loss_rgbd_seg.item(),
@@ -254,7 +261,7 @@ def model_fn_decorator(
                 
                 if not opt.test_gt:
                     # eval pose from point cloud prediction.
-                    add, adds = teval.eval_pose_parallel(
+                    add, adds, pred_kp, gt_kp, gt_ctr = teval.eval_pose_parallel(
                         cld, cu_dt['img_id'], cu_dt['rgb'], cls_rgbd, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],
@@ -263,6 +270,7 @@ def model_fn_decorator(
                         min_cnt=1, use_ctr_clus_flter=True, use_ctr=True,
                     )
                 # else:
+                    
                 #     # test GT labels, keypoint and center point offset
                 #     gt_ctr_ofs = cu_dt['ctr_targ_ofst'].unsqueeze(2).permute(0, 2, 1, 3)
                 #     gt_kp_ofs = cu_dt['kp_targ_ofst'].permute(0, 2, 1, 3)
@@ -275,10 +283,11 @@ def model_fn_decorator(
                 #         min_cnt=1, use_ctr_clus_flter=True, use_ctr=True
                 #     )
                 else:
+                    
                     # test GT labels 
                     gt_ctr_ofs = cu_dt['ctr_targ_ofst'].unsqueeze(2).permute(0, 2, 1, 3)
                     gt_kp_ofs = cu_dt['kp_targ_ofst'].permute(0, 2, 1, 3)
-                    add, adds = teval.eval_pose_parallel(
+                    add, adds, pred_kp, gt_kp, gt_ctr = teval.eval_pose_parallel(
                         cld, cu_dt['img_id'], cu_dt['rgb'], labels, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],
@@ -286,15 +295,23 @@ def model_fn_decorator(
                         ds='linemod', obj_id=config.cls_id,
                         min_cnt=1, use_ctr_clus_flter=True, use_ctr=True
                     )
-
-            test_res = {
+            if opt.eval_net:
+                test_res = {
                 'img_id':cu_dt['img_id'].item(),
                 'add': add,
-                'adds':adds
+                'adds':adds,
+                'pred_kp':pred_kp,
+                'gt_kp':gt_kp,
+                'gt_ctr':gt_ctr,
+                'cld':cu_dt['cld_rgb_nrm'][:,0:3,:].cpu().numpy()
             }
-
-        return (
+        if opt.eval_net:    
+            return (
             end_points, loss, info_dict, test_res
+        )
+        else:
+            return (
+            end_points, loss, info_dict
         )
 
     return model_fn
@@ -352,32 +369,46 @@ class Trainer(object):
         #         'loss_ctr_of': loss_ctr_of.item(),
         #         'loss_all': loss.item(),
         #         'loss_target': loss.item()
-        
+        if opt.eval_net:
+            img_ids = []
+            loss_all = []
+            loss_kp = []
+            loss_seg = []
+            loss_ctr = []
+            add = []
+            adds = []
+            pred_kp = []
+            gt_kp = []
+            gt_ctr = []
+            cld = []
         eval_dict = {}
         total_loss = 0.0
         count = 1
-        img_ids = []
-        loss_all = []
-        loss_kp = []
-        loss_seg = []
-        loss_ctr = []
-        add = []
-        adds = []
         for _, data in enumerate(d_loader):
-            
+             
             count += 1
             self.optimizer.zero_grad()
-
-            _, loss, eval_res, test_res = self.model_fn(
+            if opt.eval_net:
+                
+                _, loss, eval_res, test_res = self.model_fn(
                 self.model, data, is_eval=True, is_test=is_test, test_pose=test_pose
             )
-            img_ids.append(test_res['img_id'])
-            loss_all.append(eval_res['loss_all'])
-            loss_kp.append(eval_res['loss_kp_of'])
-            loss_seg.append(eval_res['loss_rgbd_seg'])
-            loss_ctr.append(eval_res['loss_ctr_of'])
-            add.append(test_res['add'])
-            adds.append(test_res['adds'])
+            else:
+                _, loss, eval_res = self.model_fn(
+                self.model, data, is_eval=True, is_test=is_test, test_pose=test_pose
+            )
+            if opt.eval_net:
+                img_ids.append(test_res['img_id'])
+                loss_all.append(eval_res['loss_all'])
+                loss_kp.append(eval_res['loss_kp_of'])
+                loss_seg.append(eval_res['loss_rgbd_seg'])
+                loss_ctr.append(eval_res['loss_ctr_of'])
+                add.append(test_res['add'])
+                adds.append(test_res['adds'])
+                pred_kp.append(test_res['pred_kp'])
+                gt_kp.append(test_res['gt_kp'])
+                gt_ctr.append(test_res['gt_ctr'])
+                cld.append(test_res['cld'])
             if 'loss_target' in eval_res.keys():
                 total_loss += eval_res['loss_target']
             else:
@@ -386,17 +417,20 @@ class Trainer(object):
                 if v is not None:
                     eval_dict[k] = eval_dict.get(k, []) + [v]
         
-            
-        test_results={
+        if opt.eval_net:
+            test_results={
             'img_ids':img_ids,
             'loss_all':loss_all,
             'loss_kp':loss_kp,
             'loss_seg':loss_seg,
             'loss_ctr':loss_ctr,
             'add':add,
-            'adds':adds
-            
-        }
+            'adds':adds,
+            'pred_kp':pred_kp,
+            'gt_kp':gt_kp,
+            'gt_ctr':gt_ctr,
+            'cld':cld
+            }
         
         mean_eval_dict = {}
         acc_dict = {}
@@ -427,8 +461,10 @@ class Trainer(object):
                         "val_acc": acc_dict,
                         "val_loss": total_loss / count})
             
-            
-        return total_loss / count, eval_dict, test_results
+        if opt.eval_net:   
+            return total_loss / count, eval_dict, test_results
+        else:
+            return total_loss / count, eval_dict
 
     def train(
         self,
@@ -515,8 +551,10 @@ class Trainer(object):
                 
             
             if test_loader is not None:
-                val_loss, res, _ = self.eval_epoch(test_loader, start_epoch)
-
+                if opt.eval_net:
+                    val_loss, res, _ = self.eval_epoch(test_loader, start_epoch)
+                else:
+                    val_loss, res = self.eval_epoch(test_loader, start_epoch)
                 if val_loss < best_loss:
                     best_loss = val_loss
                     if opt.local_rank == 0:
@@ -612,7 +650,7 @@ def train():
 
     if not opt.eval_net:
         model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[opt.local_rank], output_device=opt.local_rank
+            model, device_ids=[opt.local_rank], output_device=opt.local_rank,find_unused_parameters=True
         )
         clr_div = 6
         lr_scheduler = CyclicLR(
@@ -659,7 +697,7 @@ def train():
 
     if opt.eval_net:
         start = time.time()
-        val_loss, res, test_results = trainer.eval_epoch(
+        _, _, test_results = trainer.eval_epoch(
             test_loader, opt.n_total_epoch, is_test=True, test_pose=opt.test_pose
         )
         end = time.time()
@@ -673,6 +711,16 @@ def train():
         loss_ctr = test_results['loss_ctr']
         add = test_results['add']
         adds = test_results['adds']
+        
+        pred_kp = test_results['pred_kp']
+        gt_kp = test_results['gt_kp']
+        gt_ctr = test_results['gt_ctr']
+        
+        cld = test_results['cld']
+        np.save(os.path.join(opt.log_eval_dir, 'pred_kp.npy'), pred_kp) 
+        np.save(os.path.join(opt.log_eval_dir, 'gt_kp.npy'), gt_kp) 
+        np.save(os.path.join(opt.log_eval_dir, 'gt_ctr.npy'), gt_ctr)  
+        np.save(os.path.join(opt.log_eval_dir, 'cld.npy'), cld) 
         np.savetxt(os.path.join(opt.log_eval_dir, 'img_ids.txt'),img_ids)
         np.savetxt(os.path.join(opt.log_eval_dir, 'loss_all.txt'),loss_all)
         np.savetxt(os.path.join(opt.log_eval_dir, 'loss_kp.txt'),loss_kp)
@@ -680,6 +728,8 @@ def train():
         np.savetxt(os.path.join(opt.log_eval_dir, 'loss_ctr.txt'),loss_ctr)
         np.savetxt(os.path.join(opt.log_eval_dir, 'add.txt'),add)
         np.savetxt(os.path.join(opt.log_eval_dir, 'adds.txt'),adds)
+        
+        
     else:
         trainer.train(
             it, start_epoch, opt.n_total_epoch, train_loader, None,

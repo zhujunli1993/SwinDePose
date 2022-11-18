@@ -23,22 +23,23 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import CyclicLR
 import torch.backends.cudnn as cudnn
-
 import wandb
 
 from config.options import BaseOptions
 from config.common import Config, ConfigRandLA
 
 import models.pytorch_utils as pt_utils
-from models.ffb6d_rgb import FFB6D
+from models.ffb6d_pseudo_depth_lm17 import FFB6D
 from models.loss import OFLoss, FocalLoss
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
-import datasets.linemod.linemod_dataset_rgb as dataset_desc
+import datasets.linemod.linemod_dataset_pseudo_depth_lm11 as dataset_desc
 from apex.parallel import DistributedDataParallel
 from apex.parallel import convert_syncbn_model
 from apex import amp
 
+
+    
 # get options
 opt = BaseOptions().parse()
 
@@ -106,64 +107,35 @@ def save_checkpoint(
     filename = "{}.pth.tar".format(filename)
     torch.save(state, filename)
 
-## for official pretrained model
+
+
 def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
-    # filename = "{}.pth.tar".format(filename)
+    
 
     if os.path.isfile(filename):
         print("==> Loading from checkpoint '{}'".format(filename))
-        ck = torch.load(filename)
-        epoch = ck.get("epoch", 0)
-        it = ck.get("it", 0.0)
-        best_prec = ck.get("best_prec", None)
-        if model is not None and ck["model_state"] is not None:
-            ck_st = ck['model_state']
+        checkpoint = torch.load(filename)
+        epoch = checkpoint["epoch"] 
+        print("epoch: ", epoch)
+        it = checkpoint.get("it", 0.0)
+        best_prec = checkpoint["best_prec"]
+        print("best_prec: ", best_prec)
+        if model is not None and checkpoint["model_state"] is not None:
+            ck_st = checkpoint['model_state']
             if 'module' in list(ck_st.keys())[0]:
                 tmp_ck_st = {}
                 for k, v in ck_st.items():
                     tmp_ck_st[k.replace("module.", "")] = v
                 ck_st = tmp_ck_st
             model.load_state_dict(ck_st)
-        # if optimizer is not None and ck["optimizer_state"] is not None:
-        #     optimizer.load_state_dict(ck["optimizer_state"])
-        if ck.get("amp", None) is not None:
-            amp.load_state_dict(ck["amp"])
+        if optimizer is not None and checkpoint["optimizer_state"] is not None:
+            optimizer.load_state_dict(checkpoint["optimizer_state"])
+        amp.load_state_dict(checkpoint["amp"])
         print("==> Done")
         return it, epoch, best_prec
     else:
-        print("==> ck '{}' not found".format(filename))
+        print("==> Checkpoint '{}' not found".format(filename))
         return None
-
-
-## for our pretrained model    
-# def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
-#     if os.path.isfile(filename):
-#         print("==> Loading from checkpoint '{}'".format(filename))
-#         checkpoint = torch.load(filename)
-        
-#         # for our pretrained model
-#         epoch = checkpoint["epoch"] 
-#         print("epoch: ", epoch)
-#         it = checkpoint.get("it", 0.0)
-#         best_prec = checkpoint["best_prec"]
-#         print("best_prec: ", best_prec)
-        
-#         if model is not None and checkpoint["model_state"] is not None:
-#             ck_st = checkpoint['model_state']
-#             if 'module' in list(ck_st.keys())[0]:
-#                 tmp_ck_st = {}
-#                 for k, v in ck_st.items():
-#                     tmp_ck_st[k.replace("module.", "")] = v
-#                 ck_st = tmp_ck_st
-#             model.load_state_dict(ck_st)
-#         if optimizer is not None and checkpoint["optimizer_state"] is not None:
-#             optimizer.load_state_dict(checkpoint["optimizer_state"])
-#         amp.load_state_dict(checkpoint["amp"])
-#         print("==> Done")
-#         return it, epoch, best_prec
-#     else:
-#         print("==> Checkpoint '{}' not found".format(filename))
-#         return None
 
 
 def view_labels(rgb_chw, img_id, obj_id, cld_cn, labels, K=config.intrinsic_matrix['linemod']):
@@ -186,6 +158,7 @@ def view_labels(rgb_chw, img_id, obj_id, cld_cn, labels, K=config.intrinsic_matr
         colors.append(c)
     show = bs_utils.draw_p2ds(rgb_hwc, p2ds, 3, colors, 0.6)
     return show
+
 
 
 def model_fn_decorator(

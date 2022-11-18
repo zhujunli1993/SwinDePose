@@ -189,13 +189,19 @@ def model_fn_decorator(
             labels = cu_dt['labels']
             loss_rgbd_seg = criterion(
                 end_points['pred_rgbd_segs'], labels.view(-1)
-            ).sum()
+            )
+            
             loss_kp_of = criterion_of(
                 end_points['pred_kp_ofs'], cu_dt['kp_targ_ofst'], labels
-            ).sum()
+            )
+            
             loss_ctr_of = criterion_of(
                 end_points['pred_ctr_ofs'], cu_dt['ctr_targ_ofst'], labels
-            ).sum()
+            )
+            
+            loss_of = torch.cat((loss_kp_of, loss_ctr_of),1).mean(0)
+            loss_kp_of = loss_of[:8].mean()
+            loss_ctr_of = loss_of[-1]
 
             loss_lst = [
                 (loss_rgbd_seg, 2.0), (loss_kp_of, 1.0), (loss_ctr_of, 1.0),

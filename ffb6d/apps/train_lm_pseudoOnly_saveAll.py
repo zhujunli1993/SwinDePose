@@ -15,7 +15,7 @@ import shutil
 import resource
 import numpy as np
 from cv2 import imshow, waitKey
-import cv2
+
 import torch
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_sched
@@ -30,15 +30,19 @@ from config.options import BaseOptions
 from config.common import Config, ConfigRandLA
 
 import models.pytorch_utils as pt_utils
-from models.ffb6d_rgb import FFB6D
+from models.ffb6d_pseudoOnly import FFB6D
 from models.loss import OFLoss, FocalLoss
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
-import datasets.linemod.linemod_dataset_rgb as dataset_desc
+import datasets.linemod.linemod_dataset_pseudoOnly as dataset_desc
+
+
 from apex.parallel import DistributedDataParallel
 from apex.parallel import convert_syncbn_model
 from apex import amp
 
+
+    
 # get options
 opt = BaseOptions().parse()
 
@@ -106,64 +110,35 @@ def save_checkpoint(
     filename = "{}.pth.tar".format(filename)
     torch.save(state, filename)
 
-## for official pretrained model
+
+
 def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
-    # filename = "{}.pth.tar".format(filename)
+    
 
     if os.path.isfile(filename):
         print("==> Loading from checkpoint '{}'".format(filename))
-        ck = torch.load(filename)
-        epoch = ck.get("epoch", 0)
-        it = ck.get("it", 0.0)
-        best_prec = ck.get("best_prec", None)
-        if model is not None and ck["model_state"] is not None:
-            ck_st = ck['model_state']
+        checkpoint = torch.load(filename)
+        epoch = checkpoint["epoch"] 
+        print("epoch: ", epoch)
+        it = checkpoint.get("it", 0.0)
+        best_prec = checkpoint["best_prec"]
+        print("best_prec: ", best_prec)
+        if model is not None and checkpoint["model_state"] is not None:
+            ck_st = checkpoint['model_state']
             if 'module' in list(ck_st.keys())[0]:
                 tmp_ck_st = {}
                 for k, v in ck_st.items():
                     tmp_ck_st[k.replace("module.", "")] = v
                 ck_st = tmp_ck_st
             model.load_state_dict(ck_st)
-        # if optimizer is not None and ck["optimizer_state"] is not None:
-        #     optimizer.load_state_dict(ck["optimizer_state"])
-        if ck.get("amp", None) is not None:
-            amp.load_state_dict(ck["amp"])
+        if optimizer is not None and checkpoint["optimizer_state"] is not None:
+            optimizer.load_state_dict(checkpoint["optimizer_state"])
+        amp.load_state_dict(checkpoint["amp"])
         print("==> Done")
         return it, epoch, best_prec
     else:
-        print("==> ck '{}' not found".format(filename))
+        print("==> Checkpoint '{}' not found".format(filename))
         return None
-
-
-## for our pretrained model    
-# def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
-#     if os.path.isfile(filename):
-#         print("==> Loading from checkpoint '{}'".format(filename))
-#         checkpoint = torch.load(filename)
-        
-#         # for our pretrained model
-#         epoch = checkpoint["epoch"] 
-#         print("epoch: ", epoch)
-#         it = checkpoint.get("it", 0.0)
-#         best_prec = checkpoint["best_prec"]
-#         print("best_prec: ", best_prec)
-        
-#         if model is not None and checkpoint["model_state"] is not None:
-#             ck_st = checkpoint['model_state']
-#             if 'module' in list(ck_st.keys())[0]:
-#                 tmp_ck_st = {}
-#                 for k, v in ck_st.items():
-#                     tmp_ck_st[k.replace("module.", "")] = v
-#                 ck_st = tmp_ck_st
-#             model.load_state_dict(ck_st)
-#         if optimizer is not None and checkpoint["optimizer_state"] is not None:
-#             optimizer.load_state_dict(checkpoint["optimizer_state"])
-#         amp.load_state_dict(checkpoint["amp"])
-#         print("==> Done")
-#         return it, epoch, best_prec
-#     else:
-#         print("==> Checkpoint '{}' not found".format(filename))
-#         return None
 
 
 def view_labels(rgb_chw, img_id, obj_id, cld_cn, labels, K=config.intrinsic_matrix['linemod']):
@@ -191,6 +166,7 @@ def view_labels(rgb_chw, img_id, obj_id, cld_cn, labels, K=config.intrinsic_matr
 def model_fn_decorator(
     criterion, criterion_of, test=False,
 ):
+    
     teval = TorchEval()
 
     def model_fn(
@@ -216,9 +192,7 @@ def model_fn_decorator(
                     cu_dt[key] = data[key].float().cuda()
                 elif data[key].dtype in [torch.int32, torch.int16]:
                     cu_dt[key] = data[key].long().cuda()
-            
             end_points = model(cu_dt)
-            
             labels = cu_dt['labels']
             loss_rgbd_seg = criterion(
                 end_points['pred_rgbd_segs'], labels.view(-1)
@@ -536,10 +510,7 @@ class Trainer(object):
         # it = start_it
         # _, eval_frequency = is_to_eval(0, it)
         
-        # Early stopping
-        last_loss = 1e10
-        patience = 7
-        trigger_times = 0
+        
         it = start_it
         for start_epoch in tqdm.tqdm(range(n_epochs)):
             
@@ -580,30 +551,15 @@ class Trainer(object):
                     val_loss, res, _ = self.eval_epoch(test_loader, start_epoch)
                 else:
                     val_loss, res = self.eval_epoch(test_loader, start_epoch)
-                if val_loss < best_loss:
-                    best_loss = val_loss
-                    if opt.local_rank == 0:
-                        save_checkpoint(
-                            checkpoint_state(
-                                self.model, self.optimizer, val_loss, start_epoch, it
-                            ),
-                            filename=self.checkpoint_name)
-                # Early Stopping
-                current_loss = val_loss
-                if current_loss > last_loss:
-                    trigger_times += 1
-                    if trigger_times >= patience:
-                        print('Early Stopping!\n')
-                        exit()
-                else:
-                    trigger_times = 0
-                last_loss = current_loss
+                
+                if opt.local_rank == 0:
+                    save_checkpoint(checkpoint_state(self.model, self.optimizer, val_loss, start_epoch, it), filename=self.checkpoint_name+'_'+str(start_epoch)+'_epoch')
+                
         
         return val_loss
 
 
 def train():
-    
     
     print("local_rank:", opt.local_rank)
     cudnn.benchmark = True
@@ -708,7 +664,7 @@ def train():
             FocalLoss(gamma=2).to(device), OFLoss().to(device),
             opt.test,
         )
-
+    import pdb;pdb.set_trace()
     checkpoint_fd = opt.save_checkpoint
 
     trainer = Trainer(
@@ -767,6 +723,7 @@ def train():
 
 
 if __name__ == "__main__":
+    
     opt.world_size = opt.gpus * opt.nodes
     wandb.init(config=opt,
                project=opt.wandb_proj, 

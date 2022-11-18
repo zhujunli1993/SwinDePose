@@ -30,15 +30,17 @@ from config.options import BaseOptions
 from config.common import Config, ConfigRandLA
 
 import models.pytorch_utils as pt_utils
-from models.ffb6d_rgb import FFB6D
+from models.ffb6d_pseudo_depth_nrm_lm21 import FFB6D
 from models.loss import OFLoss, FocalLoss
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
-import datasets.linemod.linemod_dataset_rgb as dataset_desc
+import datasets.linemod.linemod_dataset_nrm_depth as dataset_desc
 from apex.parallel import DistributedDataParallel
 from apex.parallel import convert_syncbn_model
 from apex import amp
 
+
+    
 # get options
 opt = BaseOptions().parse()
 
@@ -106,64 +108,35 @@ def save_checkpoint(
     filename = "{}.pth.tar".format(filename)
     torch.save(state, filename)
 
-## for official pretrained model
+
+
 def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
-    # filename = "{}.pth.tar".format(filename)
+    
 
     if os.path.isfile(filename):
         print("==> Loading from checkpoint '{}'".format(filename))
-        ck = torch.load(filename)
-        epoch = ck.get("epoch", 0)
-        it = ck.get("it", 0.0)
-        best_prec = ck.get("best_prec", None)
-        if model is not None and ck["model_state"] is not None:
-            ck_st = ck['model_state']
+        checkpoint = torch.load(filename)
+        epoch = checkpoint["epoch"] 
+        print("epoch: ", epoch)
+        it = checkpoint.get("it", 0.0)
+        best_prec = checkpoint["best_prec"]
+        print("best_prec: ", best_prec)
+        if model is not None and checkpoint["model_state"] is not None:
+            ck_st = checkpoint['model_state']
             if 'module' in list(ck_st.keys())[0]:
                 tmp_ck_st = {}
                 for k, v in ck_st.items():
                     tmp_ck_st[k.replace("module.", "")] = v
                 ck_st = tmp_ck_st
             model.load_state_dict(ck_st)
-        # if optimizer is not None and ck["optimizer_state"] is not None:
-        #     optimizer.load_state_dict(ck["optimizer_state"])
-        if ck.get("amp", None) is not None:
-            amp.load_state_dict(ck["amp"])
+        if optimizer is not None and checkpoint["optimizer_state"] is not None:
+            optimizer.load_state_dict(checkpoint["optimizer_state"])
+        amp.load_state_dict(checkpoint["amp"])
         print("==> Done")
         return it, epoch, best_prec
     else:
-        print("==> ck '{}' not found".format(filename))
+        print("==> Checkpoint '{}' not found".format(filename))
         return None
-
-
-## for our pretrained model    
-# def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
-#     if os.path.isfile(filename):
-#         print("==> Loading from checkpoint '{}'".format(filename))
-#         checkpoint = torch.load(filename)
-        
-#         # for our pretrained model
-#         epoch = checkpoint["epoch"] 
-#         print("epoch: ", epoch)
-#         it = checkpoint.get("it", 0.0)
-#         best_prec = checkpoint["best_prec"]
-#         print("best_prec: ", best_prec)
-        
-#         if model is not None and checkpoint["model_state"] is not None:
-#             ck_st = checkpoint['model_state']
-#             if 'module' in list(ck_st.keys())[0]:
-#                 tmp_ck_st = {}
-#                 for k, v in ck_st.items():
-#                     tmp_ck_st[k.replace("module.", "")] = v
-#                 ck_st = tmp_ck_st
-#             model.load_state_dict(ck_st)
-#         if optimizer is not None and checkpoint["optimizer_state"] is not None:
-#             optimizer.load_state_dict(checkpoint["optimizer_state"])
-#         amp.load_state_dict(checkpoint["amp"])
-#         print("==> Done")
-#         return it, epoch, best_prec
-#     else:
-#         print("==> Checkpoint '{}' not found".format(filename))
-#         return None
 
 
 def view_labels(rgb_chw, img_id, obj_id, cld_cn, labels, K=config.intrinsic_matrix['linemod']):
@@ -186,6 +159,7 @@ def view_labels(rgb_chw, img_id, obj_id, cld_cn, labels, K=config.intrinsic_matr
         colors.append(c)
     show = bs_utils.draw_p2ds(rgb_hwc, p2ds, 3, colors, 0.6)
     return show
+
 
 
 def model_fn_decorator(
@@ -282,12 +256,12 @@ def model_fn_decorator(
                             "training loss": loss_dict,
                             "train_acc": acc_dict})
             if is_test and test_pose:
-                cld = cu_dt['cld_rgb_nrm'][:, :3, :].permute(0, 2, 1).contiguous()
+                cld = cu_dt['cld_nrm'][:, :3, :].permute(0, 2, 1).contiguous()
                 
                 if not opt.test_gt:
                     # eval pose from point cloud prediction.
                     add, adds, pred_kp, gt_kp, gt_ctr = teval.eval_pose_parallel(
-                        cld, cu_dt['img_id'], cu_dt['rgb'], cls_rgbd, end_points['pred_ctr_ofs'],
+                        cld, cu_dt['img_id'], cu_dt['nrm_angles'], cls_rgbd, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],
                         cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
@@ -313,7 +287,7 @@ def model_fn_decorator(
                     gt_ctr_ofs = cu_dt['ctr_targ_ofst'].unsqueeze(2).permute(0, 2, 1, 3)
                     gt_kp_ofs = cu_dt['kp_targ_ofst'].permute(0, 2, 1, 3)
                     add, adds, pred_kp, gt_kp, gt_ctr = teval.eval_pose_parallel(
-                        cld, cu_dt['img_id'], cu_dt['rgb'], labels, end_points['pred_ctr_ofs'],
+                        cld, cu_dt['img_id'], cu_dt['nrm_angles'], labels, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],
                         cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
@@ -328,7 +302,7 @@ def model_fn_decorator(
                 'pred_kp':pred_kp,
                 'gt_kp':gt_kp,
                 'gt_ctr':gt_ctr,
-                'cld':cu_dt['cld_rgb_nrm'][:,0:3,:].cpu().numpy()
+                'cld':cu_dt['cld_nrm'][:,0:3,:].cpu().numpy()
             }
         if opt.eval_net:    
             return (
