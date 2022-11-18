@@ -271,6 +271,7 @@ class FFB6D(nn.Module):
         n_up_layers = len(self.rndla_up_stages)
         for i_up in range(n_up_layers-1):
             # decode rgb upsampled feature
+            
             rgb_emb0 = self.cnn_up_stages[i_up](rgb_emb)
             bs, c, hr, wr = rgb_emb0.size()
 

@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.cnn.pspnet_pseudo_depth_lm10 import PSPNet
+from models.cnn.pspnet_depth_rgb import PSPNet
 import models.pytorch_utils as pt_utils
 from models.RandLA.RandLANet import Network as RandLANet
 from config.options import BaseOptions
@@ -126,6 +126,7 @@ class FFB6D(nn.Module):
                     )
                 
                 
+        
             
         # ###################### upsample stages #############################
        
@@ -279,6 +280,9 @@ class FFB6D(nn.Module):
         if not end_points:
             end_points = {}
         # ResNet pre + layer1 + layer2
+        # Dirctly concat pseudo-rgb and depth together
+        # rgb_emb = self.cnn_pre_stages(torch.cat((inputs['rgb'],inputs['depth'].unsqueeze(dim=1)),dim=1))  
+
         
         pseudo_emb0 = self.cnn_pre_stages(inputs['rgb']) 
         depth_emb0 = self.cnn_pre_stages_depth(inputs['depth'].unsqueeze(dim=1)) 
@@ -292,7 +296,7 @@ class FFB6D(nn.Module):
         ds_emb = []
         
         for i_ds in range(4):
-
+            
             if opt.attention and i_ds==0:
                 # encode rgb downsampled feature
                 pseudo_emb0 = self.cnn_ds_stages[i_ds](pseudo_emb0)
@@ -303,11 +307,12 @@ class FFB6D(nn.Module):
                 pseudo_emb0 = torch.reshape(pseudo_emb0, [bs,c, hr*wr])
                 depth_emb0 = torch.reshape(depth_emb0, [bs_, c_, hr_*wr_])
                 concat_pd = torch.permute(torch.cat((pseudo_emb0,depth_emb0),dim=1),[0,2,1])
-                img_emb = self.ds_fuse_fd_fuse_layers[i_ds](concat_pd)
+                pseudo_emb0 = self.ds_fuse_fd_fuse_layers[i_ds](concat_pd)
                 
                 # reshape rgb_emb0 and depth_emb0 for the following fusion.
-                img_emb = torch.permute(img_emb, [0, 2, 1])
+                img_emb = torch.permute(pseudo_emb0, [0, 2, 1])
                 img_emb = torch.reshape(img_emb, [bs, -1, hr, wr]) # [8 128 120 160]
+                
             
             if opt.attention and not i_ds==0:
                 img_emb = self.cnn_ds_stages[i_ds](rgb_emb)
@@ -425,6 +430,7 @@ class FFB6D(nn.Module):
         end_points['pred_ctr_ofs'] = pred_ctr_ofs
 
         return end_points
+
 
 
 # Copy from PVN3D: https://github.com/ethnhe/PVN3D

@@ -322,7 +322,7 @@ class FFB6D(nn.Module):
 
         # Use simple concatenation. Good enough for fully fused RGBD feature.
         rgbd_emb = torch.cat([rgb_emb_c, p_emb], dim=1)
-
+        
         # ###################### prediction stages #############################
         rgbd_segs = self.rgbd_seg_layer(rgbd_emb)
         pred_kp_ofs = self.kp_ofst_layer(rgbd_emb)

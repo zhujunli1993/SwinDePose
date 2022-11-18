@@ -19,6 +19,7 @@ class FocalLoss(_Loss):
         self.size_average = size_average
 
     def forward(self, input, target):
+        
         if input.dim()>2:
             # print("fcls input.size", input.size(), target.size())
             input = input.view(input.size(0),input.size(1),-1)  # N,C,H,W => N,C,H*W
@@ -37,7 +38,7 @@ class FocalLoss(_Loss):
                 self.alpha = self.alpha.type_as(input.data)
             at = self.alpha.gather(0,target.data.view(-1))
             logpt = logpt * Variable(at)
-
+        
         loss = -1 * (1-pt)**self.gamma * logpt
         if self.size_average: return loss.mean()
         else: return loss.sum()
@@ -62,7 +63,7 @@ def of_l1_loss(
     abs_diff = torch.abs(diff)
     abs_diff = w * abs_diff
     in_loss = abs_diff
-
+    
     if normalize:
         in_loss = torch.sum(
             in_loss.view(bs, n_kpts, -1), 2
@@ -70,7 +71,8 @@ def of_l1_loss(
 
     if reduce:
         in_loss = torch.mean(in_loss)
-
+    
+        
     return in_loss
 
 

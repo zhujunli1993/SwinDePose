@@ -126,6 +126,42 @@ class FFB6D(nn.Module):
                     )
                 
                 
+        else:    
+            for i in range(4):
+            
+                self.ds_fuse_fd_fuse_layers.append(
+                pt_utils.Conv2d(
+                    self.ds_rgb_oc[i]+self.ds_depth_oc_fuse[i], self.ds_rgb_oc[i], kernel_size=(1, 1),
+                    bn=True
+                    )
+                )
+
+                self.ds_fuse_r2p_pre_layers.append(
+                pt_utils.Conv2d(
+                    self.ds_rgb_oc[i], self.ds_rndla_oc[i], kernel_size=(1, 1),
+                    bn=True
+                    )
+                )
+                self.ds_fuse_r2p_fuse_layers.append(
+                    pt_utils.Conv2d(
+                    self.ds_rndla_oc[i]*2, self.ds_rndla_oc[i], kernel_size=(1, 1),
+                    bn=True
+                    )
+                )
+
+                self.ds_fuse_p2r_pre_layers.append(
+                    pt_utils.Conv2d(
+                    self.ds_rndla_oc[i], self.ds_rgb_oc[i], kernel_size=(1, 1),
+                    bn=True
+                    )
+                )
+            
+                self.ds_fuse_p2r_fuse_layers.append(
+                    pt_utils.Conv2d(
+                    self.ds_rgb_oc[i]*2, self.ds_rgb_oc[i], kernel_size=(1, 1),
+                    bn=True
+                    )
+                )
             
         # ###################### upsample stages #############################
        
@@ -185,7 +221,39 @@ class FFB6D(nn.Module):
                         bn=True
                     )
                 )
-        
+        else:
+            for i in range(n_fuse_layer):
+                self.up_fuse_fd_fuse_layers.append(
+                    pt_utils.Conv2d(
+                        self.up_rgb_oc[i]+self.up_depth_oc[i], self.up_rgb_oc[i], kernel_size=(1, 1),
+                        bn=True
+                    )
+                    )
+                self.up_fuse_r2p_pre_layers.append(
+                    pt_utils.Conv2d(
+                        self.up_rgb_oc[i], self.up_rndla_oc[i], kernel_size=(1, 1),
+                        bn=True
+                    )
+                )
+                self.up_fuse_r2p_fuse_layers.append(
+                    pt_utils.Conv2d(
+                        self.up_rndla_oc[i]*2, self.up_rndla_oc[i], kernel_size=(1, 1),
+                        bn=True
+                    )
+                )
+
+                self.up_fuse_p2r_pre_layers.append(
+                    pt_utils.Conv2d(
+                        self.up_rndla_oc[i], self.up_rgb_oc[i], kernel_size=(1, 1),
+                        bn=True
+                    )
+                )
+                self.up_fuse_p2r_fuse_layers.append(
+                    pt_utils.Conv2d(
+                        self.up_rgb_oc[i]*2, self.up_rgb_oc[i], kernel_size=(1, 1),
+                        bn=True
+                    )
+                )
         # ####################### prediction headers #############################
         # We use 3D keypoint prediction header for pose estimation following PVN3D
         # You can use different prediction headers for different downstream tasks.
@@ -292,25 +360,27 @@ class FFB6D(nn.Module):
         ds_emb = []
         
         for i_ds in range(4):
-
-            if opt.attention and i_ds==0:
+            if i_ds == 0:
                 # encode rgb downsampled feature
                 pseudo_emb0 = self.cnn_ds_stages[i_ds](pseudo_emb0)
                 # encode depth downsampled feature
                 depth_emb0 = self.cnn_depth_ds_stages[i_ds](depth_emb0)
+                
+            if opt.attention and i_ds==0:
                 bs, c, hr, wr = pseudo_emb0.size()
                 bs_, c_, hr_, wr_ = depth_emb0.size()
                 pseudo_emb0 = torch.reshape(pseudo_emb0, [bs,c, hr*wr])
                 depth_emb0 = torch.reshape(depth_emb0, [bs_, c_, hr_*wr_])
                 concat_pd = torch.permute(torch.cat((pseudo_emb0,depth_emb0),dim=1),[0,2,1])
-                img_emb = self.ds_fuse_fd_fuse_layers[i_ds](concat_pd)
+                pseudo_emb0 = self.ds_fuse_fd_fuse_layers[i_ds](concat_pd)
                 
                 # reshape rgb_emb0 and depth_emb0 for the following fusion.
-                img_emb = torch.permute(img_emb, [0, 2, 1])
+                img_emb = torch.permute(pseudo_emb0, [0, 2, 1])
                 img_emb = torch.reshape(img_emb, [bs, -1, hr, wr]) # [8 128 120 160]
+                depth_emb0 = torch.reshape(depth_emb0, [bs, -1, hr_, wr_])
             
             if opt.attention and not i_ds==0:
-                img_emb = self.cnn_ds_stages[i_ds](rgb_emb)
+                img_emb = self.cnn_ds_stages[i_ds](img_emb)
                 bs, c, hr, wr = img_emb.size()
                 img_emb = torch.reshape(img_emb, [bs,c, hr*wr])
                 img_emb = torch.permute(img_emb,[0,2,1])
@@ -319,6 +389,16 @@ class FFB6D(nn.Module):
                 img_emb = torch.permute(img_emb, [0, 2, 1])
                 img_emb = torch.reshape(img_emb, [bs, -1, hr, wr]) # [8 128 120 160]
                 
+            if not opt.attention and not i_ds ==0:
+                # encode rgb downsampled feature
+                pseudo_emb0 = self.cnn_ds_stages[i_ds](torch.cat((pseudo_emb0,rgb_emb),dim=1))
+                # encode depth downsampled feature
+                depth_emb0 = self.cnn_depth_ds_stages[i_ds](torch.cat((depth_emb0,rgb_emb),dim=1))
+                # Concat rgb_emb with depth_emb
+                img_emb = self.ds_fuse_fd_fuse_layers[i_ds](torch.cat((depth_emb0,pseudo_emb0),dim=1))
+            if not opt.attention and i_ds==0:
+                # Concat rgb_emb with depth_emb
+                img_emb = self.ds_fuse_fd_fuse_layers[i_ds](torch.cat((depth_emb0,pseudo_emb0),dim=1))
             
             bs, c, hr, wr = img_emb.size()
 

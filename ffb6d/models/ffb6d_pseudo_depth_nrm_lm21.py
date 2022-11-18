@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from models.cnn.pspnet_pseudo_depth_lm10 import PSPNet
+from models.cnn.pspnet_nrm_depth_lm21 import PSPNet
 import models.pytorch_utils as pt_utils
 from models.RandLA.RandLANet import Network as RandLANet
 from config.options import BaseOptions
@@ -280,11 +280,11 @@ class FFB6D(nn.Module):
             end_points = {}
         # ResNet pre + layer1 + layer2
         
-        pseudo_emb0 = self.cnn_pre_stages(inputs['rgb']) 
+        pseudo_emb0 = self.cnn_pre_stages(inputs['nrm_angles']) 
         depth_emb0 = self.cnn_pre_stages_depth(inputs['depth'].unsqueeze(dim=1)) 
         # rndla pre
         # xyz, p_emb = self._break_up_pc(inputs['cld_rgb_nrm'])
-        p_emb = inputs['cld_rgb_nrm'] # cld, rgb_c_pt, nrm_pt: selected points
+        p_emb = inputs['cld_nrm'] # cld, rgb_c_pt, nrm_pt: selected points
         p_emb = self.rndla_pre_stages(p_emb)
         p_emb = p_emb.unsqueeze(dim=3)  # Batch*channel*npoints*1
 
