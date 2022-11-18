@@ -22,10 +22,7 @@ class ConfigRandLA:
     val_batch_size = opt.val_batch_size  # batch_size during validation and test
     train_steps = opt.train_steps  # Number of steps per epochs
     val_steps = opt.val_steps  # Number of validation steps per epoch
-    if opt.depth_only or opt.rgb_only:
-        in_c = 9 # input channels
-    else:
-        in_c = 12
+    in_c = int(opt.in_c)
     sub_sampling_ratio = opt.sub_sampling_ratio  # sampling ratio of random sampling at each layer
     d_out = opt.d_out  # feature dimension
     num_sub_points = [num_points // 4, num_points // 16, num_points // 64, num_points // 256]
@@ -96,8 +93,8 @@ class Config:
             self.fuse_path = os.path.join(self.lm_root, 'fuse/%s/*.pkl' % cls_type)
             self.test_path = os.path.join(self.cls_root, opt.test_list)
             if not opt.lm_no_fuse and not opt.lm_no_render:
-                self.render_files = os.path.join(self.lm_root, 'renders/%s/file_list.txt' % cls_type)
-                self.fuse_files = os.path.join(self.lm_root, 'fuse/%s/file_list.txt' % cls_type)
+                self.render_files = os.path.join(self.lm_root, 'renders_nrm/%s/file_list.txt' % cls_type)
+                self.fuse_files = os.path.join(self.lm_root, 'fuse_nrm/%s/file_list.txt' % cls_type)
             
             self.use_orbfps = True
             self.kp_orbfps_dir = os.path.join(self.lm_root, 'kps_orb9_fps')

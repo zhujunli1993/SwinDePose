@@ -50,6 +50,8 @@ class BaseOptions():
         g_exp.add_argument('--depth_split', action='store_true', help='if true, add depth to input and consider depth channel as a seperate info')
         g_exp.add_argument('--attention', action='store_true', help='if true, use self-attention module to fuse the pseudo and depth emb.')
         g_exp.add_argument('--add_rgb', action='store_true', help='if true, add real RGB channel to pseudo_depth_rgb experiments.')
+        g_exp.add_argument('--less_randla', action='store_true', help='if true, only include point clouds and normals as randla input.')
+        g_exp.add_argument('--in_c', type=int, default=9, help='input layers for rnala.')
         # Training related
         g_train = parser.add_argument_group('Training')
         g_train.add_argument('--log_eval_dir', type=str, help='path to save evaluation results' )
@@ -62,6 +64,7 @@ class BaseOptions():
         g_train.add_argument('--test_mini_batch_size', type=int, default=1, help='testing batch size')
         g_train.add_argument('--weight_decay', type=float, default=0,help='L2 regularization coeff [default: 0.0]')
         g_train.add_argument('--lr', type=float, default=1e-2, help="Initial learning rate [default: 1e-2]")
+        g_train.add_argument('--max_lr', type=float, default=1e-4, help="Max learning rate for cyclicLR")
         g_train.add_argument('--lr_decay', type=float, default=0.5,help="Learning rate decay gamma [default: 0.5]")
         g_train.add_argument('--decay_step', type=float, default=2e5,help="Learning rate decay step [default: 20]")
         g_train.add_argument('--bn_momentum', type=float, default=0.9,help="Initial batch norm momentum [default: 0.9]")
