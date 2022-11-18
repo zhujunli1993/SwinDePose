@@ -22,6 +22,9 @@ except ImportError:
     from cv2 import imshow, waitKey
 import math
 
+# for get depth_filling function
+config_fill = Config(ds_name='ycb')
+bs_utils_fill = Basic_Utils(config_fill)
 class Dataset():
 
     def __init__(self, dataset_name, cls_type="duck", DEBUG=False):
@@ -87,7 +90,28 @@ class Dataset():
             self.tst_lst = self.bs_utils.read_lines(tst_img_pth)
             self.all_lst = self.tst_lst
         print("{}_dataset_size: ".format(dataset_name), len(self.all_lst))
-
+    
+    # def fill_missing(
+    #     self, dpt, cam_scale, scale_2_80m, fill_type='multiscale',
+    #         extrapolate=False, show_process=False, blur_type='bilateral'
+    # ):
+    #     dpt = dpt / cam_scale * scale_2_80m
+    #     projected_depth = dpt.copy()
+    #     if fill_type == 'fast':
+    #         final_dpt = bs_utils_fill.fill_in_fast(
+    #             projected_depth, extrapolate=extrapolate, blur_type=blur_type,
+    #             # max_depth=2.0
+    #         )
+    #     elif fill_type == 'multiscale':
+    #         final_dpt, process_dict = depth_map_utils.fill_in_multiscale(
+    #             projected_depth, extrapolate=extrapolate, blur_type=blur_type,
+    #             show_process=show_process,
+    #             max_depth=3.0
+    #         )
+    #     else:
+    #         raise ValueError('Invalid fill_type {}'.format(fill_type))
+    #     dpt = final_dpt / scale_2_80m * cam_scale
+    #     return dpt
     def real_syn_gen(self, real_ratio=0.3):
         if len(self.rnd_lst+self.fuse_lst) == 0:
             real_ratio = 1.0
@@ -222,137 +246,8 @@ class Dataset():
         dpt_3d = dpt_3d * msk[:, :, None]
         return dpt_3d
     
-    def pseudo_gen(self, dpt_xyz):
-        # Set up-axis 
-        x_up = np.array([1.0, 0.0, 0.0])
-        y_up = np.array([0.0, 1.0, 0.0])
-        z_up = np.array([0.0, 0.0, 1.0])
-
-        angle_x = []
-        signed_x = []
-        angle_y = []
-        signed_y = []
-        angle_z = []
-        signed_z = []
-        dpt_xyz = np.reshape(dpt_xyz,(self.opt.height, self.opt.width, 3))
-        for i in range(0, self.opt.height):
-            for j in range(1, self.opt.width):
-                p_2 = dpt_xyz[i, j]
-                p_1 = dpt_xyz[i, j-1]
-                if p_2[0]+p_2[1]+p_2[2]==0.0 or p_1[0]+p_1[1]+p_1[2]==0.0:
-                    angle_x.append(360.0)
-                    angle_y.append(360.0)
-                    angle_z.append(360.0)
-                    signed_x.append(360.0)
-                    signed_y.append(360.0)
-                    signed_z.append(360.0)
-                    continue
-                else:
-                    difference = p_2 - p_1
-                    difference_lengh = np.sqrt(math.pow(difference[0],2)+math.pow(difference[1],2)+math.pow(difference[2],2))
-                    epsilon = 1E-6
-                    if difference_lengh < epsilon:
-                        angle_x.append(360.0)
-                        angle_y.append(360.0)
-                        angle_z.append(360.0)
-                        signed_x.append(360.0)
-                        signed_y.append(360.0)
-                        signed_z.append(360.0)
-                        continue
-                    else:
-                        value_x = (difference[0]*x_up[0] + difference[1]*x_up[1] + difference[2]*x_up[2]) / difference_lengh
-                        value_y = (difference[0]*y_up[0] + difference[1]*y_up[1] + difference[2]*y_up[2]) / difference_lengh
-                        value_z = (difference[0]*z_up[0] + difference[1]*z_up[1] + difference[2]*z_up[2]) / difference_lengh
-                        if value_x > (1.0 - epsilon):
-                            value_x = 1.0
-                        elif value_x < (epsilon - 1.0):
-                            value_x = -1.0 
-                        angle_x.append(np.arccos(value_x)*180.0/math.pi)
-                        
-                        if value_y > (1.0 - epsilon):
-                            value_y = 1.0
-                        elif value_y < (epsilon - 1.0):
-                            value_y = -1.0 
-                        angle_y.append(np.arccos(value_y)*180.0/math.pi)
-                        
-                        if value_z > (1.0 - epsilon):
-                            value_z = 1.0
-                        elif value_z < (epsilon - 1.0):
-                            value_z = -1.0 
-                        angle_z.append(np.arccos(value_z)*180.0/math.pi)
-                        
-                        if j == 1:
-                            signed_x.append(360.0)
-                            signed_y.append(360.0)
-                            signed_z.append(360.0)
-                            continue
-                        else:
-                            
-                            p_0 = dpt_xyz[i, j-2]
-                        
-                            if p_0[0]+p_0[1]+p_0[2]==0.0:
-                                signed_x.append(360.0)
-                                signed_y.append(360.0)
-                                signed_z.append(360.0)
-                                continue
-                            else:
-                                dot_prod = difference[0]*(p_1[0]-p_0[0]) + difference[1]*(p_1[1]-p_0[1]) + difference[2]*(p_1[2]-p_0[2])
-                                if dot_prod >= 0.0:
-                                    signed_x.append(math.acos(value_x)*180.0/math.pi)
-                                else:
-                                    signed_x.append(-1*math.acos(value_x)*180.0/math.pi)
-                                if dot_prod >= 0.0:
-                                    signed_y.append(math.acos(value_y)*180.0/math.pi)
-                                else:
-                                    signed_y.append(-1*math.acos(value_y)*180.0/math.pi)
-                                if dot_prod >= 0.0:
-                                    signed_z.append(math.acos(value_z)*180.0/math.pi)
-                                else:
-                                    signed_z.append(-1*math.acos(value_z)*180.0/math.pi)
-            angle_x.append(360.0)
-            angle_y.append(360.0)
-            angle_z.append(360.0)
-            signed_x.append(360.0)
-            signed_y.append(360.0)
-            signed_z.append(360.0)
-            
-        angle_x = np.reshape(angle_x, [self.opt.height, self.opt.width])
-        signed_x = np.reshape(signed_x, [self.opt.height, self.opt.width])
-        angle_y = np.reshape(angle_y, [self.opt.height, self.opt.width])
-        signed_y = np.reshape(signed_y, [self.opt.height, self.opt.width])
-        angle_z = np.reshape(angle_z, [self.opt.height, self.opt.width])
-        signed_z = np.reshape(signed_z, [self.opt.height, self.opt.width])
-
-
-        angle_x[angle_x==360] = 255
-        angle_x = (angle_x-angle_x[angle_x<255].min())*(254/(angle_x[angle_x<255].max()-angle_x[angle_x<255].min()))
-        angle_y[angle_y==360] = 255
-        angle_y = (angle_y-angle_y[angle_y<255].min())*(254/(angle_y[angle_y<255].max()-angle_y[angle_y<255].min()))
-        angle_z[angle_z==360] = 255
-        angle_z = (angle_z-angle_z[angle_z<255].min())*(254/(angle_z[angle_z<255].max()-angle_z[angle_z<255].min()))
-            
-            
-        # combine three channels and save to a png image
-        new_img_angles = np.dstack((angle_x, angle_y))
-        new_img_angles = np.dstack((new_img_angles, angle_z))
-        new_img_angles = new_img_angles.astype(np.uint8)
-        
-        
-        signed_x[signed_x==360] = 255
-        signed_x = (signed_x-signed_x[signed_x<255].min())*(254/(signed_x[signed_x<255].max()-signed_x[signed_x<255].min()))
-        signed_y[signed_y==360] = 255
-        signed_y = (signed_y-signed_y[signed_y<255].min())*(254/(signed_y[signed_y<255].max()-signed_y[signed_y<255].min()))
-        signed_z[signed_z==360] = 255
-        signed_z = (signed_z-signed_z[signed_z<255].min())*(254/(signed_z[signed_z<255].max()-signed_z[signed_z<255].min()))
     
-    
-        # combine three channels and save to a png image
-        new_img_signed = np.dstack((signed_x, signed_y))
-        new_img_signed = np.dstack((new_img_signed, signed_z))
-        new_img_signed = new_img_signed.astype(np.uint8)
         
-        return new_img_angles, new_img_signed
-    
     
     def scale_pseudo(self, pseudo):
     # Scale the pseudo angles and signed angles to image range (0 ~ 255)
@@ -386,7 +281,7 @@ class Dataset():
             sed_signed = self.scale_pseudo(signed)
             sed_angles = Image.fromarray(np.uint8(sed_angles))
             sed_signed = Image.fromarray(np.uint8(sed_signed))
-            
+            cam_scale = 1000.0
             rgb = np.float32(sed_angles)
             rgb_s = np.float32(sed_signed)
             labels = data['mask']
@@ -406,27 +301,24 @@ class Dataset():
                 labels = (labels > 0).astype("uint8")
             #with Image.open(os.path.join(self.cls_root, "pseudo_angles/{}.png".format(item_name))) as ri:
             
-            with np.load(os.path.join(self.cls_root, "pseudo_angles_signed/{}.npz".format(item_name))) as data:
+            with np.load(os.path.join(self.cls_root, "pseudo_nrm_angles/{}.npz".format(item_name))) as data:
                 angles = data['angles']
-                signed = data['signed']
+                
                 # scaling = []
                 # convert angles and signed angles to image range (0~255)
                 sed_angles = self.scale_pseudo(angles)
-                sed_signed = self.scale_pseudo(signed)
+                
                 # valid_msk = ~np.all(angles == np.array([360,360,360]), axis=-1)
                 # valid_index = np.where(valid_msk==True)
                 sed_angles = Image.fromarray(np.uint8(sed_angles))
-                sed_signed = Image.fromarray(np.uint8(sed_signed))
+                
                 if self.add_noise:
                     sed_angles = self.trancolor(sed_angles)
-                rgb = np.array(sed_angles)[:, :, :3]
+                nrm_angles = np.array(sed_angles)[:, :, :3]
             #with Image.open(os.path.join(self.cls_root, "pseudo_signed/{}.png".format(item_name))) as rs:
-                if self.add_noise:
-                    sed_signed = self.trancolor(sed_signed)
-                rgb_s = np.array(sed_signed)[:, :, :3]
+                
             #valid_dpt_mm = np.ma.masked_array(dpt_mm, valid_msk)
-                
-                
+
             
             meta = self.meta_lst[int(item_name)]
             if self.cls_id == 2:
@@ -441,7 +333,9 @@ class Dataset():
             RT = np.concatenate((R, T[:, None]), axis=1)
             rnd_typ = 'real'
             K = self.config.intrinsic_matrix["linemod"]
+            cam_scale = 1000.0
             
+            dpt_mm = bs_utils_fill.fill_missing(dpt_mm, cam_scale, 1)
             dpt_mm_rgb = dpt_mm.copy()
             second_min = np.unique(dpt_mm_rgb)[1]
             index = np.where(dpt_mm_rgb==0)
@@ -450,9 +344,7 @@ class Dataset():
             dpt_mm_rgb = factor * (dpt_mm_rgb - second_min)
             dpt_mm_rgb[index] = 255
             
-        
-        cam_scale = 1000.0
-        
+
         dpt_mm = dpt_mm.copy().astype(np.uint16)
         nrm_map = normalSpeed.depth_normal(
             dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False
@@ -491,9 +383,7 @@ class Dataset():
                 rgb = self.rgb_add_noise(rgb)
                 rgb_s = self.rgb_add_noise(rgb_s)
     
-        rgb_c = np.concatenate((rgb, rgb_s), axis=2)  #[h,w,6]
-        
-            
+
         msk_dp = dpt_mm > 1e-6
         choose = msk_dp.flatten().nonzero()[0].astype(np.uint32)
         if len(choose) < 400:
@@ -515,21 +405,19 @@ class Dataset():
         choose = choose[sf_idx]
 
         cld = dpt_xyz.reshape(-1, 3)[choose, :]
-
-        rgb_c_pt = rgb_c.reshape(-1, 6)[choose, :].astype(np.float32)
         
         nrm_pt = nrm_map[:, :, :3].reshape(-1, 3)[choose, :]
         labels_pt = labels.flatten()[choose]
         choose = np.array([choose])
-        cld_rgb_nrm = np.concatenate((cld, rgb_c_pt, nrm_pt), axis=1).transpose(1, 0)
+        cld_nrm = np.concatenate((cld, nrm_pt), axis=1).transpose(1, 0)
 
         RTs, kp3ds, ctr3ds, cls_ids, kp_targ_ofst, ctr_targ_ofst = self.get_pose_gt_info(
             cld, labels_pt, RT
         )
 
         h, w = self.opt.height, self.opt.width
-        dpt_6c = np.concatenate((dpt_xyz, nrm_map[:, :, :3]), axis=2).transpose(2, 0, 1)
-        rgb_c = np.transpose(rgb_c, (2, 0, 1)) # hwc2chw
+
+        nrm_angles = np.transpose(nrm_angles, (2, 0, 1)) # hwc2chw
 
         xyz_lst = [dpt_xyz.transpose(2, 0, 1)]  # c, h, w
         msk_lst = [dpt_xyz[2, :, :] > 1e-8]
@@ -544,7 +432,7 @@ class Dataset():
             pow(2, ii): item.reshape(3, -1).transpose(1, 0)
             for ii, item in enumerate(xyz_lst)
         }
-        
+
         rgb_ds_sr = [4, 8, 8, 8]
         n_ds_layers = 4
         pcld_sub_s_r = [4, 4, 4, 4]
@@ -567,11 +455,6 @@ class Dataset():
                 sr2dptxyz[rgb_ds_sr[i]][None, ...], sub_pts[None, ...], 16
             ).astype(np.int32).squeeze(0)
             inputs['r2p_ds_nei_idx%d' % i] = nei_r2p.copy()
-            
-            nei_r2r = DP.knn_search(
-                sr2dptxyz[rgb_ds_sr[i]][None, ...], sr2dptxyz[rgb_ds_sr[i]][None, ...], 16
-            ).astype(np.int32).squeeze(0)
-            inputs['r2r_ds_nei_idx%d' % i] = nei_r2r.copy()
             nei_p2r = DP.knn_search(
                 sub_pts[None, ...], sr2dptxyz[rgb_ds_sr[i]][None, ...], 1
             ).astype(np.int32).squeeze(0)
@@ -586,12 +469,6 @@ class Dataset():
                 inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...], 16
             ).astype(np.int32).squeeze(0)
             inputs['r2p_up_nei_idx%d' % i] = r2p_nei.copy()
-            
-            r2r_nei = DP.knn_search(
-                sr2dptxyz[rgb_up_sr[i]][None, ...],
-                sr2dptxyz[rgb_up_sr[i]][None, ...], 16
-            ).astype(np.int32).squeeze(0)
-            inputs['r2r_up_nei_idx%d' % i] = r2r_nei.copy()
             p2r_nei = DP.knn_search(
                 inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...],
                 sr2dptxyz[rgb_up_sr[i]][None, ...], 1
@@ -619,9 +496,9 @@ class Dataset():
             item_name = item_name.split('/')[-1].split('.')[0]
         item_dict = dict(
             img_id=np.uint8(item_name),
-            rgb=rgb_c.astype(np.uint8),  # [c, h, w]
+            nrm_angles=nrm_angles.astype(np.uint8),  # [c, h, w]
             depth=dpt_mm_rgb.astype(np.uint8), #[1, h, w]
-            cld_rgb_nrm=cld_rgb_nrm.astype(np.float32),  # [9, npts]
+            cld_nrm=cld_nrm.astype(np.float32),  # [9, npts]
             choose=choose.astype(np.int32),  # [1, npts]
             labels=labels_pt.astype(np.int32),  # [npts]
             rgb_labels=rgb_labels.astype(np.int32),  # [h, w]

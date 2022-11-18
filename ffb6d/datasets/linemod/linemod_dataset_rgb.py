@@ -391,7 +391,8 @@ class Dataset():
         #     "cls_ids:", cls_ids, "\n",
         #     "labels.unique:", np.unique(labels),
         # )
-
+        if ".npz" in item_name:
+            item_name = item_name.split('/')[-1].split('.')[0]
         item_dict = dict(
             img_id=np.uint8(item_name),
             rgb=rgb_c.astype(np.uint8),  # [c, h, w]
