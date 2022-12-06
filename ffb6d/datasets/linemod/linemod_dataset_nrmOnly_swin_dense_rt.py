@@ -21,7 +21,7 @@ try:
 except ImportError:
     from cv2 import imshow, waitKey
 import math
-
+from scipy.spatial.transform import Rotation
 # for get depth_filling function
 config_fill = Config(ds_name='ycb')
 bs_utils_fill = Basic_Utils(config_fill)
@@ -38,13 +38,13 @@ class Dataset():
 
         self.trancolor = transforms.ColorJitter(0.2, 0.2, 0.2, 0.05)
         self.norm = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.224])
-        
+
         self.cls_type = cls_type
-        
         self.cls_id = self.config.cls_id
         print("cls_id in lm_dataset.py", self.cls_id)
         self.root = self.config.lm_root
         self.cls_root = self.config.cls_root
+        self.points = self.bs_utils.get_pointxyz(self.cls_id, ds_type=dataset_name)
         self.rng = np.random
         meta_file = open(os.path.join(self.cls_root, 'gt.yml'), "r")
         self.meta_lst = yaml.safe_load(meta_file)
@@ -301,7 +301,6 @@ class Dataset():
             with np.load(os.path.join(self.cls_root, "pseudo_nrm_angles/{}.npz".format(item_name))) as data:
                 angles = data['angles']
                 
-                # scaling = []
                 # convert angles and signed angles to image range (0~255)
                 sed_angles = self.scale_pseudo(angles)
                 # if True:
@@ -347,6 +346,7 @@ class Dataset():
             # dpt_mm_rgb = factor * (dpt_mm_rgb - second_min)
             # dpt_mm_rgb[index] = 255
             
+        
         
         dpt_mm = dpt_mm.copy().astype(np.uint16)
         nrm_map = normalSpeed.depth_normal(
@@ -398,79 +398,81 @@ class Dataset():
         choose = choose[sf_idx]
 
         cld = dpt_xyz.reshape(-1, 3)[choose, :]
-        
+        nrm_angles_pt = nrm_angles.reshape(-1, 3)[choose, :].astype(np.float32)
+        nrm_pt = nrm_map[:, :, :3].reshape(-1, 3)[choose, :]
         labels_pt = labels.flatten()[choose]
         choose = np.array([choose])
-        cld_angle_nrm = cld.transpose(1, 0)
+        #cld_angle_nrm = cld.transpose(1, 0)
+        cld_angle_nrm = np.concatenate((cld, nrm_angles_pt, nrm_pt), axis=1).transpose(1, 0)
 
         RTs, kp3ds, ctr3ds, cls_ids, kp_targ_ofst, ctr_targ_ofst = self.get_pose_gt_info(
             cld, labels_pt, RT
         )
 
-        # h, w = self.opt.height, self.opt.width
+        h, w = self.opt.height, self.opt.width
 
         nrm_angles = np.transpose(nrm_angles, (2, 0, 1)) # hwc2chw
 
-        # xyz_lst = [dpt_xyz.transpose(2, 0, 1)]  # c, h, w
-        # msk_lst = [dpt_xyz[2, :, :] > 1e-8]
+        xyz_lst = [dpt_xyz.transpose(2, 0, 1)]  # c, h, w
+        msk_lst = [dpt_xyz[2, :, :] > 1e-8]
         
-        # for i in range(3):
-        #     scale = pow(2, i+1)
+        for i in range(3):
+            scale = pow(2, i+1)
 
-        #     nh, nw = h // pow(2, i+3), w // pow(2, i+3)
-        #     ys, xs = np.mgrid[:nh, :nw]
-        #     xyz_lst.append(xyz_lst[0][:, ys*scale, xs*scale])
-        #     msk_lst.append(xyz_lst[-1][2, :, :] > 1e-8)
+            nh, nw = h // pow(2, i+3), w // pow(2, i+3)
+            ys, xs = np.mgrid[:nh, :nw]
+            xyz_lst.append(xyz_lst[0][:, ys*scale, xs*scale])
+            msk_lst.append(xyz_lst[-1][2, :, :] > 1e-8)
         
-        # sr2dptxyz = {
-        #     pow(2, ii): item.reshape(3, -1).transpose(1, 0)
-        #     for ii, item in enumerate(xyz_lst)
-        # }
+        sr2dptxyz = {
+            pow(2, ii): item.reshape(3, -1).transpose(1, 0)
+            for ii, item in enumerate(xyz_lst)
+        }
 
-        # rgb_ds_sr = [4, 8, 8, 8]
-        # n_ds_layers = 4
-        # pcld_sub_s_r = [4, 4, 4, 4]
-        # inputs = {}
-        # # DownSample stage
-        # for i in range(n_ds_layers):
+        rgb_ds_sr = [4, 8, 8, 8]
+        n_ds_layers = 4
+        pcld_sub_s_r = [4, 4, 4, 4]
+        inputs = {}
+        # DownSample stage
+        for i in range(n_ds_layers):
             
-        #     nei_idx = DP.knn_search(
-        #         cld[None, ...], cld[None, ...], 16
-        #     ).astype(np.int32).squeeze(0)
-        #     sub_pts = cld[:cld.shape[0] // pcld_sub_s_r[i], :]
-        #     pool_i = nei_idx[:cld.shape[0] // pcld_sub_s_r[i], :]
-        #     up_i = DP.knn_search(
-        #         sub_pts[None, ...], cld[None, ...], 1
-        #     ).astype(np.int32).squeeze(0)
-        #     inputs['cld_xyz%d' % i] = cld.astype(np.float32).copy()
-        #     inputs['cld_nei_idx%d' % i] = nei_idx.astype(np.int32).copy()
+            nei_idx = DP.knn_search(
+                cld[None, ...], cld[None, ...], 16
+            ).astype(np.int32).squeeze(0)
+            sub_pts = cld[:cld.shape[0] // pcld_sub_s_r[i], :]
+            pool_i = nei_idx[:cld.shape[0] // pcld_sub_s_r[i], :]
+            up_i = DP.knn_search(
+                sub_pts[None, ...], cld[None, ...], 1
+            ).astype(np.int32).squeeze(0)
+            inputs['cld_xyz%d' % i] = cld.astype(np.float32).copy()
+            inputs['cld_nei_idx%d' % i] = nei_idx.astype(np.int32).copy()
             
-        #     inputs['cld_sub_idx%d' % i] = pool_i.astype(np.int32).copy()
-        #     inputs['cld_interp_idx%d' % i] = up_i.astype(np.int32).copy()
-        #     nei_r2p = DP.knn_search(
-        #         sr2dptxyz[rgb_ds_sr[i]][None, ...], sub_pts[None, ...], 16
-        #     ).astype(np.int32).squeeze(0)
-        #     inputs['r2p_ds_nei_idx%d' % i] = nei_r2p.copy()
+            inputs['cld_sub_idx%d' % i] = pool_i.astype(np.int32).copy()
+            inputs['cld_interp_idx%d' % i] = up_i.astype(np.int32).copy()
+            # nei_r2p = DP.knn_search(
+            #     sr2dptxyz[rgb_ds_sr[i]][None, ...], sub_pts[None, ...], 16
+            # ).astype(np.int32).squeeze(0)
+            #inputs['r2p_ds_nei_idx%d' % i] = nei_r2p.copy()
             
-        #     nei_p2r = DP.knn_search(
-        #         sub_pts[None, ...], sr2dptxyz[rgb_ds_sr[i]][None, ...], 1
-        #     ).astype(np.int32).squeeze(0)
-        #     inputs['p2r_ds_nei_idx%d' % i] = nei_p2r.copy()
-        #     cld = sub_pts
+            # nei_p2r = DP.knn_search(
+            #     sub_pts[None, ...], sr2dptxyz[rgb_ds_sr[i]][None, ...], 1
+            # ).astype(np.int32).squeeze(0)
+            #inputs['p2r_ds_nei_idx%d' % i] = nei_p2r.copy()
+            cld = sub_pts
 
-        # n_up_layers = 3
-        # rgb_up_sr = [4, 2, 2]
-        # for i in range(n_up_layers):
-        #     r2p_nei = DP.knn_search(
-        #         sr2dptxyz[rgb_up_sr[i]][None, ...],
-        #         inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...], 16
-        #     ).astype(np.int32).squeeze(0)
-        #     inputs['r2p_up_nei_idx%d' % i] = r2p_nei.copy()
-        #     p2r_nei = DP.knn_search(
-        #         inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...],
-        #         sr2dptxyz[rgb_up_sr[i]][None, ...], 1
-        #     ).astype(np.int32).squeeze(0)
-        #     inputs['p2r_up_nei_idx%d' % i] = p2r_nei.copy()
+        n_up_layers = 3
+        rgb_up_sr = [4, 2, 2]
+        for i in range(n_up_layers):
+            r2p_nei = DP.knn_search(
+                sr2dptxyz[rgb_up_sr[i]][None, ...],
+                inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...], 16
+            ).astype(np.int32).squeeze(0)
+            #inputs['r2p_up_nei_idx%d' % i] = r2p_nei.copy()
+            p2r_nei = DP.knn_search(
+                inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...],
+                sr2dptxyz[rgb_up_sr[i]][None, ...], 1
+            ).astype(np.int32).squeeze(0)
+            #inputs['p2r_up_nei_idx%d' % i] = p2r_nei.copy()
 
         # show_rgb = rgb.transpose(1, 2, 0).copy()[:, :, ::-1]
         # if self.DEBUG:
@@ -495,19 +497,21 @@ class Dataset():
         item_dict = dict(
             img_id=np.uint8(item_name),
             nrm_angles=nrm_angles.astype(np.uint8),  # [c, h, w]
+            cld_angle_nrm=cld_angle_nrm.astype(np.float32),  # [9, npts]
             choose=choose.astype(np.int32),  # [1, npts]
-            cld_angle_nrm=cld_angle_nrm.astype(np.float32),  # [3, npts]
-            dpt_xyz_map=dpt_xyz.astype(np.float32),
             labels=labels_pt.astype(np.int32),  # [npts]
             rgb_labels=rgb_labels.astype(np.int32),  # [h, w]
+            dpt_map_m=dpt_m.astype(np.float32),  # [h, w]
+            points=self.points.astype(np.float32),
             RTs=RTs.astype(np.float32),
+            K=K.astype(np.float32),
             kp_targ_ofst=kp_targ_ofst.astype(np.float32),
             ctr_targ_ofst=ctr_targ_ofst.astype(np.float32),
             cls_ids=cls_ids.astype(np.int32),
             ctr_3ds=ctr3ds.astype(np.float32),
             kp_3ds=kp3ds.astype(np.float32),
         )
-        # item_dict.update(inputs)
+        item_dict.update(inputs)
         # if self.DEBUG:
         #     extra_d = dict(
         #         dpt_xyz_nrm=dpt_6c.astype(np.float32),  # [6, h, w]
@@ -517,9 +521,10 @@ class Dataset():
         #     item_dict.update(extra_d)
         #     item_dict['normal_map'] = nrm_map[:, :, :3].astype(np.float32)
         return item_dict
-    
+
     def get_pose_gt_info(self, cld, labels, RT):
         RTs = np.zeros((self.config.n_objects, 3, 4))
+        
         kp3ds = np.zeros((self.config.n_objects, self.opt.n_keypoints, 3))
         ctr3ds = np.zeros((self.config.n_objects, 3))
         cls_ids = np.zeros((self.config.n_objects, 1))

@@ -21,7 +21,7 @@ try:
 except ImportError:
     from cv2 import imshow, waitKey
 import math
-
+import json
 # for get depth_filling function
 config_fill = Config(ds_name='ycb')
 bs_utils_fill = Basic_Utils(config_fill)
@@ -53,6 +53,11 @@ class Dataset():
             real_img_pth = self.config.train_path
             self.real_lst = self.bs_utils.read_lines(real_img_pth)
             
+            if not self.opt.lm_no_pbr:
+                self.pbr_lst = self.bs_utils.read_lines(self.config.pbr_mask_files)
+            else:
+                self.pbr_lst=[]
+            print("PBR data length: ", len(self.pbr_lst))
             if not self.opt.lm_no_render:
                 self.rnd_lst = self.bs_utils.read_lines(self.config.render_files)
                 # rnd_img_ptn = self.config.render_path
@@ -82,7 +87,7 @@ class Dataset():
                 warning += "Please generate fused data from https://github.com/ethnhe/raster_triangle.\n"
                 print(warning)
 
-            self.all_lst = self.real_lst + self.rnd_lst + self.fuse_lst
+            self.all_lst = self.real_lst + self.rnd_lst + self.fuse_lst + self.pbr_lst
             self.minibatch_per_epoch = len(self.all_lst) //  self.opt.mini_batch_size
         else:
             self.add_noise = False
@@ -113,7 +118,7 @@ class Dataset():
     #     dpt = final_dpt / scale_2_80m * cam_scale
     #     return dpt
     def real_syn_gen(self, real_ratio=0.3):
-        if len(self.rnd_lst+self.fuse_lst) == 0:
+        if len(self.rnd_lst+self.fuse_lst+self.pbr_lst) == 0:
             real_ratio = 1.0
         if self.rng.rand() < real_ratio:  # real
             n_imgs = len(self.real_lst)
@@ -121,18 +126,14 @@ class Dataset():
             pth = self.real_lst[idx]
             return pth
         else:
-            if len(self.fuse_lst) > 0 and len(self.rnd_lst) > 0:
-                fuse_ratio = 0.4
-            elif len(self.fuse_lst) == 0:
-                fuse_ratio = 0.
-            else:
-                fuse_ratio = 1.
-            if self.rng.rand() < fuse_ratio:
-                idx = self.rng.randint(0, len(self.fuse_lst))
-                pth = self.fuse_lst[idx]
-            else:
-                idx = self.rng.randint(0, len(self.rnd_lst))
-                pth = self.rnd_lst[idx]
+            # if len(self.fuse_lst) > 0 and len(self.rnd_lst) > 0:
+            if len(self.pbr_lst) > 0:
+                pbr_ratio = 1.0
+            
+            if self.rng.rand() < pbr_ratio:
+                idx = self.rng.randint(0, len(self.pbr_lst))
+                pth = self.pbr_lst[idx]
+            
             return pth
 
     def real_gen(self):
@@ -289,6 +290,42 @@ class Dataset():
                 labels = (labels == self.cls_id).astype("uint8")
             else:
                 labels = (labels > 0).astype("uint8")
+        
+        elif "mask" in item_name:
+
+            with Image.open(item_name) as li:
+                labels = np.array(li)
+                labels = (labels > 0).astype("uint8")
+            rgb_idx = item_name.split("/")[-1].split("_")[0]
+            with Image.open(os.path.join(self.root, "000000/rgb/{}.jpg".format(rgb_idx))) as ri:
+                if self.add_noise:
+                    ri = self.trancolor(ri)
+                rgb = np.array(ri)[:, :, :3] # set rgb from pbr as sed_angles
+            with Image.open(os.path.join(self.root, "000000/depth/{}.png".format(rgb_idx))) as di:
+                dpt_mm = np.array(di)
+            
+            depth_scale = 0.1
+            dpt_mm = dpt_mm * depth_scale
+            cam_scale = 1000.0
+            #dpt_mm = bs_utils_fill.fill_missing(dpt_mm, cam_scale, 1)
+            K = np.array([[572.4114, 0.0, 325.2611082792282], 
+                          [0.0, 573.57043, 242.04899594187737], 
+                          [0.0, 0.0, 1.0]])
+            
+            gt_info_file = os.path.join(self.root, "000000/scene_gt.json")
+            gt_info_f = open(gt_info_file)
+            gt_info = json.load(gt_info_f)
+            info_idx = int(rgb_idx)
+            info_idx = str(info_idx)
+            info = gt_info[info_idx]
+            
+            for idx in range(len(info)):
+                meta = info[idx]
+                if meta['obj_id']==self.config.cls_id:
+                    R = np.resize(np.array(meta['cam_R_m2c']), (3, 3))
+                    T = np.array(meta['cam_t_m2c']) / 1000.0
+                    RT = np.concatenate((R, T[:, None]), axis=1)
+            rnd_typ = "pbr"
         else:
         
             with Image.open(os.path.join(self.cls_root, "depth/{}.png".format(item_name))) as di:
@@ -298,31 +335,11 @@ class Dataset():
                 labels = (labels > 0).astype("uint8")
             #with Image.open(os.path.join(self.cls_root, "pseudo_angles/{}.png".format(item_name))) as ri:
             
-            with np.load(os.path.join(self.cls_root, "pseudo_nrm_angles/{}.npz".format(item_name))) as data:
-                angles = data['angles']
-                
-                # scaling = []
-                # convert angles and signed angles to image range (0~255)
-                sed_angles = self.scale_pseudo(angles)
-                # if True:
-                #     import pdb;pdb.set_trace()
-                #     img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data','15','vis_angles_training_noNoise{}.png'.format(item_name))
-                #     cv2.imwrite(img_file, sed_angles)
-                # valid_msk = ~np.all(angles == np.array([360,360,360]), axis=-1)
-                # valid_index = np.where(valid_msk==True)
-                sed_angles = Image.fromarray(np.uint8(sed_angles))
-                
+            with Image.open(os.path.join(self.cls_root, "rgb/{}.png".format(item_name))) as ri:
                 if self.add_noise:
-                    sed_angles = self.trancolor(sed_angles)
-                nrm_angles = np.array(sed_angles)[:, :, :3]
-                # if True:
-                #     img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data','15','vis_angles_training_Noise{}.png'.format(item_name))
-                #     cv2.imwrite(img_file, nrm_angles)
-            #with Image.open(os.path.join(self.cls_root, "pseudo_signed/{}.png".format(item_name))) as rs:
-                
-            #valid_dpt_mm = np.ma.masked_array(dpt_mm, valid_msk)
+                    ri = self.trancolor(ri)
+                rgb = np.array(ri)[:, :, :3]
 
-            
             meta = self.meta_lst[int(item_name)]
             if self.cls_id == 2:
                 for i in range(0, len(meta)):
@@ -356,6 +373,7 @@ class Dataset():
         #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
         #     imshow("nrm_map", show_nrm_map)
 
+        
         dpt_m = dpt_mm.astype(np.float32) / cam_scale
         dpt_xyz = self.dpt_2_pcld(dpt_m, 1.0, K)
         dpt_xyz[np.isnan(dpt_xyz)] = 0.0
@@ -366,14 +384,14 @@ class Dataset():
             labels = labels[:, :, 0]
         rgb_labels = labels.copy()
 
-        if self.add_noise and rnd_typ != 'real':
-            if rnd_typ == 'render' or self.rng.rand() < 0.8:
-                nrm_angles = self.rgb_add_noise(nrm_angles)
-                rgb_labels = labels.copy()
-                msk_dp = dpt_mm > 1e-6
-                nrm_angles, dpt_mm = self.add_real_back(nrm_angles, rgb_labels, dpt_mm, msk_dp)
-            if self.rng.rand() > 0.8:
-                nrm_angles = self.rgb_add_noise(nrm_angles)
+        # if self.add_noise and rnd_typ != 'real':
+        #     if rnd_typ == 'render' or self.rng.rand() < 0.8:
+        #         nrm_angles = self.rgb_add_noise(nrm_angles)
+        #         rgb_labels = labels.copy()
+        #         msk_dp = dpt_mm > 1e-6
+        #         nrm_angles, dpt_mm = self.add_real_back(nrm_angles, rgb_labels, dpt_mm, msk_dp)
+        #     if self.rng.rand() > 0.8:
+        #         nrm_angles = self.rgb_add_noise(nrm_angles)
 
     
 
@@ -398,55 +416,57 @@ class Dataset():
         choose = choose[sf_idx]
 
         cld = dpt_xyz.reshape(-1, 3)[choose, :]
-        
+        rgb_c_pt = rgb.reshape(-1, 3)[choose, :].astype(np.float32)
+        nrm_pt = nrm_map[:, :, :3].reshape(-1, 3)[choose, :]
         labels_pt = labels.flatten()[choose]
         choose = np.array([choose])
-        cld_angle_nrm = cld.transpose(1, 0)
+        cld_angle_nrm = np.concatenate((cld, rgb_c_pt, nrm_pt), axis=1).transpose(1, 0)
+        
 
         RTs, kp3ds, ctr3ds, cls_ids, kp_targ_ofst, ctr_targ_ofst = self.get_pose_gt_info(
             cld, labels_pt, RT
         )
 
-        # h, w = self.opt.height, self.opt.width
-
-        nrm_angles = np.transpose(nrm_angles, (2, 0, 1)) # hwc2chw
-
-        # xyz_lst = [dpt_xyz.transpose(2, 0, 1)]  # c, h, w
-        # msk_lst = [dpt_xyz[2, :, :] > 1e-8]
+        h, w = self.opt.height, self.opt.width
         
-        # for i in range(3):
-        #     scale = pow(2, i+1)
+        rgb = np.transpose(rgb, (2, 0, 1)) # hwc2chw
 
-        #     nh, nw = h // pow(2, i+3), w // pow(2, i+3)
-        #     ys, xs = np.mgrid[:nh, :nw]
-        #     xyz_lst.append(xyz_lst[0][:, ys*scale, xs*scale])
-        #     msk_lst.append(xyz_lst[-1][2, :, :] > 1e-8)
+        xyz_lst = [dpt_xyz.transpose(2, 0, 1)]  # c, h, w
+        msk_lst = [dpt_xyz[2, :, :] > 1e-8]
         
-        # sr2dptxyz = {
-        #     pow(2, ii): item.reshape(3, -1).transpose(1, 0)
-        #     for ii, item in enumerate(xyz_lst)
-        # }
+        for i in range(3):
+            scale = pow(2, i+1)
 
-        # rgb_ds_sr = [4, 8, 8, 8]
-        # n_ds_layers = 4
-        # pcld_sub_s_r = [4, 4, 4, 4]
-        # inputs = {}
+            nh, nw = h // pow(2, i+3), w // pow(2, i+3)
+            ys, xs = np.mgrid[:nh, :nw]
+            xyz_lst.append(xyz_lst[0][:, ys*scale, xs*scale])
+            msk_lst.append(xyz_lst[-1][2, :, :] > 1e-8)
+        
+        sr2dptxyz = {
+            pow(2, ii): item.reshape(3, -1).transpose(1, 0)
+            for ii, item in enumerate(xyz_lst)
+        }
+
+        rgb_ds_sr = [4, 8, 8, 8]
+        n_ds_layers = 4
+        pcld_sub_s_r = [4, 4, 4, 4]
+        inputs = {}
         # # DownSample stage
-        # for i in range(n_ds_layers):
+        for i in range(n_ds_layers):
             
-        #     nei_idx = DP.knn_search(
-        #         cld[None, ...], cld[None, ...], 16
-        #     ).astype(np.int32).squeeze(0)
-        #     sub_pts = cld[:cld.shape[0] // pcld_sub_s_r[i], :]
-        #     pool_i = nei_idx[:cld.shape[0] // pcld_sub_s_r[i], :]
-        #     up_i = DP.knn_search(
-        #         sub_pts[None, ...], cld[None, ...], 1
-        #     ).astype(np.int32).squeeze(0)
-        #     inputs['cld_xyz%d' % i] = cld.astype(np.float32).copy()
-        #     inputs['cld_nei_idx%d' % i] = nei_idx.astype(np.int32).copy()
+            nei_idx = DP.knn_search(
+                cld[None, ...], cld[None, ...], 16
+            ).astype(np.int32).squeeze(0)
+            sub_pts = cld[:cld.shape[0] // pcld_sub_s_r[i], :]
+            pool_i = nei_idx[:cld.shape[0] // pcld_sub_s_r[i], :]
+            up_i = DP.knn_search(
+                sub_pts[None, ...], cld[None, ...], 1
+            ).astype(np.int32).squeeze(0)
+            inputs['cld_xyz%d' % i] = cld.astype(np.float32).copy()
+            inputs['cld_nei_idx%d' % i] = nei_idx.astype(np.int32).copy()
             
-        #     inputs['cld_sub_idx%d' % i] = pool_i.astype(np.int32).copy()
-        #     inputs['cld_interp_idx%d' % i] = up_i.astype(np.int32).copy()
+            inputs['cld_sub_idx%d' % i] = pool_i.astype(np.int32).copy()
+            inputs['cld_interp_idx%d' % i] = up_i.astype(np.int32).copy()
         #     nei_r2p = DP.knn_search(
         #         sr2dptxyz[rgb_ds_sr[i]][None, ...], sub_pts[None, ...], 16
         #     ).astype(np.int32).squeeze(0)
@@ -456,20 +476,20 @@ class Dataset():
         #         sub_pts[None, ...], sr2dptxyz[rgb_ds_sr[i]][None, ...], 1
         #     ).astype(np.int32).squeeze(0)
         #     inputs['p2r_ds_nei_idx%d' % i] = nei_p2r.copy()
-        #     cld = sub_pts
+            cld = sub_pts
 
-        # n_up_layers = 3
-        # rgb_up_sr = [4, 2, 2]
-        # for i in range(n_up_layers):
-        #     r2p_nei = DP.knn_search(
-        #         sr2dptxyz[rgb_up_sr[i]][None, ...],
-        #         inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...], 16
-        #     ).astype(np.int32).squeeze(0)
-        #     inputs['r2p_up_nei_idx%d' % i] = r2p_nei.copy()
-        #     p2r_nei = DP.knn_search(
-        #         inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...],
-        #         sr2dptxyz[rgb_up_sr[i]][None, ...], 1
-        #     ).astype(np.int32).squeeze(0)
+        n_up_layers = 3
+        rgb_up_sr = [4, 2, 2]
+        for i in range(n_up_layers):
+            r2p_nei = DP.knn_search(
+                sr2dptxyz[rgb_up_sr[i]][None, ...],
+                inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...], 16
+            ).astype(np.int32).squeeze(0)
+            inputs['r2p_up_nei_idx%d' % i] = r2p_nei.copy()
+            p2r_nei = DP.knn_search(
+                inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...],
+                sr2dptxyz[rgb_up_sr[i]][None, ...], 1
+            ).astype(np.int32).squeeze(0)
         #     inputs['p2r_up_nei_idx%d' % i] = p2r_nei.copy()
 
         # show_rgb = rgb.transpose(1, 2, 0).copy()[:, :, ::-1]
@@ -492,9 +512,11 @@ class Dataset():
         
         if ".npz" in item_name:
             item_name = item_name.split('/')[-1].split('.')[0]
+        if "mask" in item_name:
+            item_name = item_name.split('/')[-1].split('_')[0]
         item_dict = dict(
             img_id=np.uint8(item_name),
-            nrm_angles=nrm_angles.astype(np.uint8),  # [c, h, w]
+            rgb=rgb.astype(np.uint8),  # [c, h, w]
             choose=choose.astype(np.int32),  # [1, npts]
             cld_angle_nrm=cld_angle_nrm.astype(np.float32),  # [3, npts]
             dpt_xyz_map=dpt_xyz.astype(np.float32),
@@ -507,7 +529,7 @@ class Dataset():
             ctr_3ds=ctr3ds.astype(np.float32),
             kp_3ds=kp3ds.astype(np.float32),
         )
-        # item_dict.update(inputs)
+        item_dict.update(inputs)
         # if self.DEBUG:
         #     extra_d = dict(
         #         dpt_xyz_nrm=dpt_6c.astype(np.float32),  # [6, h, w]

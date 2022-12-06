@@ -80,39 +80,4 @@ def pseudo_nrm_angle(nrm_map):
     new_img_angles = np.dstack((new_img_angles, angle_z))
     return new_img_angles            
 # Looping to check the wrong case
-# ren_path = '/workspace/DATA/Linemod_preprocessed/fuse_nrm/phone/file_list.txt'
-# contents = np.loadtxt(ren_path, dtype='str')
-# for file in contents:
-    
-#     values = np.load(file)
-#     angle = values['angles']
-    
-#     if len(np.unique(angle)) > 1:
 
-#         print(file)
-
-file = '/workspace/DATA/Linemod_preprocessed/fuse_nrm/phone/7342.npz'
-values = np.load(file)
-for k in values.keys():
-    print(k)
-
-angle = values['angles']
-rgb = values['rgb']
-depth = values['depth']
-K = values['K']
-cam_scale = 1000.0
-dpt_mm = depth * cam_scale
-dpt_mm = dpt_mm.copy().astype(np.uint16)
-
-nrm_map = normalSpeed.depth_normal(dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False)
-angle_ = pseudo_nrm_angle(nrm_map)
-print('angle: ', np.unique(angle))
-print('angle_: ', np.unique(angle_))
-rgb_angle = scale_pseudo(angle)
-rgb_angle_ = scale_pseudo(angle_)
-
-# depth_ = scale_depth(depth)
-img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data','15','vis_fuse_nrm_7342.png')
-cv2.imwrite(img_file, rgb_angle)
-img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data','15','vis_fuse_nrm_7342_.png')
-cv2.imwrite(img_file, rgb_angle_)

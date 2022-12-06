@@ -6,7 +6,7 @@ import os
 import cv2
 import tqdm
 import normalSpeed
-
+import json
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
 
@@ -73,7 +73,7 @@ def dpt_2_pcld(dpt, cam_scale, K):
     dpt_3d = dpt_3d * msk[:, :, None]
     return dpt_3d
 
-def pseudo_nrm_angle(args, dpt_xyz, nrm_map):
+def pseudo_nrm_angle(nrm_map):
     height=480
     width=640
     # Set up-axis 
@@ -87,7 +87,7 @@ def pseudo_nrm_angle(args, dpt_xyz, nrm_map):
     # signed_y = []
     angle_z = []
     # signed_z = []
-    dpt_xyz = np.reshape(dpt_xyz,(height, width, 3))
+    # dpt_xyz = np.reshape(dpt_xyz,(height, width, 3))
     for i in range(0, height):
         for j in range(0, width):
             if sum(nrm_map[i, j])==0.0:
@@ -137,7 +137,9 @@ def pseudo_nrm_angle(args, dpt_xyz, nrm_map):
     else:
         new_img_angles = np.dstack((angle_x, angle_y))
         new_img_angles = np.dstack((new_img_angles, angle_z))
-    return new_img_angles            
+    return new_img_angles     
+
+       
 def pseudo_gen(args, dpt_xyz):
     height=480
     width=640
@@ -266,7 +268,7 @@ def pseudo_gen(args, dpt_xyz):
     angle_z = np.reshape(angle_z, [height, width])
     # signed_z = np.reshape(signed_z, [height, width])
 
-    if True:
+    if args.vis_img:
         angle_x[angle_x==360] = 255
         angle_x = (angle_x-angle_x[angle_x<255].min())*(254/(angle_x[angle_x<255].max()-angle_x[angle_x<255].min()))
         angle_y[angle_y==360] = 255
@@ -310,7 +312,7 @@ meta_file = open(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.c
 meta_lst = yaml.safe_load(meta_file)
 
 for item_name in tqdm.tqdm(trainlist):
-# item_name = '0006'
+
     with Image.open(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num, "depth/{}.png".format(item_name))) as di:
         dpt_mm = np.array(di)
 
@@ -327,14 +329,15 @@ for item_name in tqdm.tqdm(trainlist):
     #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
     #     img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_nrm_{}.png'.format(item_name))
     #     cv2.imwrite(img_file, show_nrm_map)
-    dpt_m = dpt_mm.astype(np.float32) / cam_scale
-    dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
-    dpt_xyz[np.isnan(dpt_xyz)] = 0.0
-    dpt_xyz[np.isinf(dpt_xyz)] = 0.0
+    
+    # dpt_m = dpt_mm.astype(np.float32) / cam_scale
+    # dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
+    # dpt_xyz[np.isnan(dpt_xyz)] = 0.0
+    # dpt_xyz[np.isinf(dpt_xyz)] = 0.0
 
     
     # rgb = pseudo_gen(args, dpt_xyz)
-    rgb_nrm = pseudo_nrm_angle(args, dpt_xyz, nrm_map)
+    rgb_nrm = pseudo_nrm_angle(nrm_map)
     
     if args.vis_img:
         img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_cur_{}.png'.format(item_name))
@@ -353,9 +356,11 @@ for item_name in tqdm.tqdm(trainlist):
         # cv2.imwrite(img_file, rgb_s)
         print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
         exit()
+        
+        
     if not os.path.exists(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles')):
         os.makedirs(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles'))
-    rgb_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles','{}'.format(item_name) )
+    rgb_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles','{}'.format(item_name))
     np.savez_compressed(rgb_file, angles=rgb_nrm)
 print('Finish real/ training data generation!!')
 
@@ -378,14 +383,14 @@ for item_name in tqdm.tqdm(testlist):
     #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
     #     img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_nrm_{}.png'.format(item_name))
     #     cv2.imwrite(img_file, show_nrm_map)
-    dpt_m = dpt_mm.astype(np.float32) / cam_scale
-    dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
-    dpt_xyz[np.isnan(dpt_xyz)] = 0.0
-    dpt_xyz[np.isinf(dpt_xyz)] = 0.0
+    # dpt_m = dpt_mm.astype(np.float32) / cam_scale
+    # dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
+    # dpt_xyz[np.isnan(dpt_xyz)] = 0.0
+    # dpt_xyz[np.isinf(dpt_xyz)] = 0.0
 
     
     # rgb = pseudo_gen(args, dpt_xyz)
-    rgb_nrm = pseudo_nrm_angle(args, dpt_xyz, nrm_map)
+    rgb_nrm = pseudo_nrm_angle( nrm_map)
     
     if args.vis_img:
         img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_cur_{}.png'.format(item_name))
@@ -404,12 +409,46 @@ for item_name in tqdm.tqdm(testlist):
         # cv2.imwrite(img_file, rgb_s)
         print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
         exit()
+        
+        
     if not os.path.exists(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles')):
         os.makedirs(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles'))
-    rgb_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles','{}'.format(item_name) )
+    rgb_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles','{}'.format(item_name))
     np.savez_compressed(rgb_file, angles=rgb_nrm)
 print('Finish real/ testing data generation!!')
 
+
+# K=np.array([[572.4114, 0.0, 325.2611082792282], 
+#             [0.0, 573.57043, 242.04899594187737], 
+#             [0.0, 0.0, 1.0]])
+# depth_scale=0.1
+# gt_info_file = "/workspace/DATA/Linemod_preprocessed/000000/scene_gt.json"
+# gt_info_f = open(gt_info_file)
+# gt_info = json.load(gt_info_f)
+# obj_id=2
+# for num in gt_info.keys():
+#     info = gt_info[num]
+#     for idx in range(len(info)):
+#         gt_idx = info[idx]
+#         if gt_idx['obj_id']==obj_id:
+#             print('/workspace/DATA/Linemod_preprocessed/000000/mask/{:06d}_'.format(int(num))+'{:06d}.png'.format(idx))
+        
+        
+
+# depth_img = "/workspace/DATA/Linemod_preprocessed/000000/depth/000000.png"
+# with Image.open(depth_img) as di:
+#     dpt_mm = np.array(di)
+
+# dpt_mm = dpt_mm*depth_scale
+# dpt_mm = dpt_mm.astype(np.uint16)
+# nrm_map = normalSpeed.depth_normal(dpt_mm, K[0][0], K[1][1], 5, 2500, 20, False)
+# nrm_angle_vis = pseudo_nrm_angle(nrm_map)
+# if True:
+#     img_file = "/workspace/DATA/Linemod_preprocessed/000000/nrm_angle_000000.png"
+#     cv2.imwrite(img_file, nrm_angle_vis)
+#     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
+#     img_file = "/workspace/DATA/Linemod_preprocessed/000000/nrm_000000.png"
+#     cv2.imwrite(img_file, show_nrm_map)
 
 # Look at histogram
 

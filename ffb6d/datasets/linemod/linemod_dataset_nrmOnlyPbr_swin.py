@@ -21,7 +21,7 @@ try:
 except ImportError:
     from cv2 import imshow, waitKey
 import math
-
+import json
 # for get depth_filling function
 config_fill = Config(ds_name='ycb')
 bs_utils_fill = Basic_Utils(config_fill)
@@ -53,6 +53,11 @@ class Dataset():
             real_img_pth = self.config.train_path
             self.real_lst = self.bs_utils.read_lines(real_img_pth)
             
+            if not self.opt.lm_no_pbr:
+                self.pbr_lst = self.bs_utils.read_lines(self.config.pbr_mask_files)
+            else:
+                self.pbr_lst=[]
+            
             if not self.opt.lm_no_render:
                 self.rnd_lst = self.bs_utils.read_lines(self.config.render_files)
                 # rnd_img_ptn = self.config.render_path
@@ -82,7 +87,7 @@ class Dataset():
                 warning += "Please generate fused data from https://github.com/ethnhe/raster_triangle.\n"
                 print(warning)
 
-            self.all_lst = self.real_lst + self.rnd_lst + self.fuse_lst
+            self.all_lst = self.real_lst + self.rnd_lst + self.fuse_lst + self.pbr_lst
             self.minibatch_per_epoch = len(self.all_lst) //  self.opt.mini_batch_size
         else:
             self.add_noise = False
@@ -113,7 +118,7 @@ class Dataset():
     #     dpt = final_dpt / scale_2_80m * cam_scale
     #     return dpt
     def real_syn_gen(self, real_ratio=0.3):
-        if len(self.rnd_lst+self.fuse_lst) == 0:
+        if len(self.rnd_lst+self.fuse_lst+self.pbr_lst) == 0:
             real_ratio = 1.0
         if self.rng.rand() < real_ratio:  # real
             n_imgs = len(self.real_lst)
@@ -121,18 +126,14 @@ class Dataset():
             pth = self.real_lst[idx]
             return pth
         else:
-            if len(self.fuse_lst) > 0 and len(self.rnd_lst) > 0:
-                fuse_ratio = 0.4
-            elif len(self.fuse_lst) == 0:
-                fuse_ratio = 0.
-            else:
-                fuse_ratio = 1.
-            if self.rng.rand() < fuse_ratio:
-                idx = self.rng.randint(0, len(self.fuse_lst))
-                pth = self.fuse_lst[idx]
-            else:
-                idx = self.rng.randint(0, len(self.rnd_lst))
-                pth = self.rnd_lst[idx]
+            # if len(self.fuse_lst) > 0 and len(self.rnd_lst) > 0:
+            if len(self.pbr_lst) > 0:
+                pbr_ratio = 1.0
+            
+            if self.rng.rand() < pbr_ratio:
+                idx = self.rng.randint(0, len(self.pbr_lst))
+                pth = self.pbr_lst[idx]
+            
             return pth
 
     def real_gen(self):
@@ -289,8 +290,44 @@ class Dataset():
                 labels = (labels == self.cls_id).astype("uint8")
             else:
                 labels = (labels > 0).astype("uint8")
-        else:
         
+        elif "mask" in item_name:
+
+            with Image.open(item_name) as li:
+                labels = np.array(li)
+                labels = (labels > 0).astype("uint8")
+            rgb_idx = item_name.split("/")[-1].split("_")[0]
+            with Image.open(os.path.join(self.root, "000000/rgb/{}.jpg".format(rgb_idx))) as ri:
+                if self.add_noise:
+                    ri = self.trancolor(ri)
+                nrm_angles = np.array(ri)[:, :, :3] # set rgb from pbr as sed_angles
+            with Image.open(os.path.join(self.root, "000000/depth/{}.png".format(rgb_idx))) as di:
+                dpt_mm = np.array(di)
+            
+            depth_scale = 0.1
+            dpt_mm = dpt_mm * depth_scale
+            cam_scale = 1000.0
+            #dpt_mm = bs_utils_fill.fill_missing(dpt_mm, cam_scale, 1)
+            K = np.array([[572.4114, 0.0, 325.2611082792282], 
+                          [0.0, 573.57043, 242.04899594187737], 
+                          [0.0, 0.0, 1.0]])
+            
+            gt_info_file = os.path.join(self.root, "000000/scene_gt.json")
+            gt_info_f = open(gt_info_file)
+            gt_info = json.load(gt_info_f)
+            info_idx = int(rgb_idx)
+            info_idx = str(info_idx)
+            info = gt_info[info_idx]
+            
+            for idx in range(len(info)):
+                meta = info[idx]
+                if meta['obj_id']==self.config.cls_id:
+                    R = np.resize(np.array(meta['cam_R_m2c']), (3, 3))
+                    T = np.array(meta['cam_t_m2c']) / 1000.0
+                    RT = np.concatenate((R, T[:, None]), axis=1)
+            rnd_typ = "pbr"
+        else:
+            
             with Image.open(os.path.join(self.cls_root, "depth/{}.png".format(item_name))) as di:
                 dpt_mm = np.array(di)
             with Image.open(os.path.join(self.cls_root, "mask/{}.png".format(item_name))) as li:
@@ -349,13 +386,14 @@ class Dataset():
             
         
         dpt_mm = dpt_mm.copy().astype(np.uint16)
-        nrm_map = normalSpeed.depth_normal(
-            dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False
-        )
+        # nrm_map = normalSpeed.depth_normal(
+        #     dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False
+        # )
         # if self.DEBUG:
         #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
         #     imshow("nrm_map", show_nrm_map)
 
+        
         dpt_m = dpt_mm.astype(np.float32) / cam_scale
         dpt_xyz = self.dpt_2_pcld(dpt_m, 1.0, K)
         dpt_xyz[np.isnan(dpt_xyz)] = 0.0
@@ -366,14 +404,14 @@ class Dataset():
             labels = labels[:, :, 0]
         rgb_labels = labels.copy()
 
-        if self.add_noise and rnd_typ != 'real':
-            if rnd_typ == 'render' or self.rng.rand() < 0.8:
-                nrm_angles = self.rgb_add_noise(nrm_angles)
-                rgb_labels = labels.copy()
-                msk_dp = dpt_mm > 1e-6
-                nrm_angles, dpt_mm = self.add_real_back(nrm_angles, rgb_labels, dpt_mm, msk_dp)
-            if self.rng.rand() > 0.8:
-                nrm_angles = self.rgb_add_noise(nrm_angles)
+        # if self.add_noise and rnd_typ != 'real':
+        #     if rnd_typ == 'render' or self.rng.rand() < 0.8:
+        #         nrm_angles = self.rgb_add_noise(nrm_angles)
+        #         rgb_labels = labels.copy()
+        #         msk_dp = dpt_mm > 1e-6
+        #         nrm_angles, dpt_mm = self.add_real_back(nrm_angles, rgb_labels, dpt_mm, msk_dp)
+        #     if self.rng.rand() > 0.8:
+        #         nrm_angles = self.rgb_add_noise(nrm_angles)
 
     
 
@@ -398,7 +436,8 @@ class Dataset():
         choose = choose[sf_idx]
 
         cld = dpt_xyz.reshape(-1, 3)[choose, :]
-        
+        # nrm_angles_pt = nrm_angles.reshape(-1, 3)[choose, :].astype(np.float32)
+        # nrm_pt = nrm_map[:, :, :3].reshape(-1, 3)[choose, :]
         labels_pt = labels.flatten()[choose]
         choose = np.array([choose])
         cld_angle_nrm = cld.transpose(1, 0)
@@ -408,7 +447,7 @@ class Dataset():
         )
 
         # h, w = self.opt.height, self.opt.width
-
+        
         nrm_angles = np.transpose(nrm_angles, (2, 0, 1)) # hwc2chw
 
         # xyz_lst = [dpt_xyz.transpose(2, 0, 1)]  # c, h, w
@@ -492,6 +531,8 @@ class Dataset():
         
         if ".npz" in item_name:
             item_name = item_name.split('/')[-1].split('.')[0]
+        if "mask" in item_name:
+            item_name = item_name.split('/')[-1].split('_')[0]
         item_dict = dict(
             img_id=np.uint8(item_name),
             nrm_angles=nrm_angles.astype(np.uint8),  # [c, h, w]
