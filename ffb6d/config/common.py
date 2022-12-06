@@ -14,7 +14,7 @@ class ConfigRandLA:
         opt.height, opt.width = opt.max_h, opt.max_w
     k_n = opt.k_n  # KNN
     num_layers = opt.num_layers  # Number of layers
-    num_points = opt.height * opt.width // 24  # Number of input points
+    num_points = opt.height * opt.width // 16  # Number of input points
     num_classes = 22  # Number of valid classes, 22 for YCBV dataset
     sub_grid_size = opt.sub_grid_size  # preprocess_parameter
 
@@ -95,7 +95,10 @@ class Config:
             if not opt.lm_no_fuse and not opt.lm_no_render:
                 self.render_files = os.path.join(self.lm_root, 'renders_nrm/%s/file_list.txt' % cls_type)
                 self.fuse_files = os.path.join(self.lm_root, 'fuse_nrm/%s/file_list.txt' % cls_type)
-            
+                self.render_files_rgb = os.path.join(self.lm_root, 'renders/%s/file_list.txt' % cls_type)
+                self.fuse_files_rgb = os.path.join(self.lm_root, 'fuse/%s/file_list.txt' % cls_type)
+            if not opt.lm_no_pbr:    
+                self.pbr_mask_files = os.path.join(self.lm_root, 'train_pbr/train_pbr_obj_%d.txt' % self.cls_id)
             self.use_orbfps = True
             self.kp_orbfps_dir = os.path.join(self.lm_root, 'kps_orb9_fps')
             
