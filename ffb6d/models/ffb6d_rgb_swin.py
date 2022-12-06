@@ -30,7 +30,9 @@ class FFB6D(nn.Module):
         self.swin_ffb = swin.SwinTransformer(patch_size=4)
         self.psp_head = uper_head.UPerHead(in_channels=[96,192,384,768],channels=256,in_index=[0,1,2,3],num_classes=2)
         self.psp_fuse_head = uper_head.UPerHead(in_channels=[192,384,768,1536],channels=256,in_index=[0,1,2,3],num_classes=2)
-
+        self.ds_rgb_swin = [384,384,384,384]
+        self.ds_pc_swin = [64,64,64,64]
+        self.ds_fuse_swin = [64,64,64,64]
 
 
         # ####################### prediction headers #############################
@@ -125,8 +127,8 @@ class FFB6D(nn.Module):
             end_points = {}
         
         
-        bs, _, h, w = inputs['nrm_angles'].shape
-        feat_nrm = self.swin_ffb(inputs['nrm_angles']) # [1,96,120,160]->[1,192,60,80]->[1,384,30,40]->[1,768,15,20]
+        bs, _, h, w = inputs['rgb'].shape
+        feat_nrm = self.swin_ffb(inputs['rgb']) # [1,96,120,160]->[1,192,60,80]->[1,384,30,40]->[1,768,15,20]
         feat_xyz = self.swin_ffb(inputs['dpt_xyz_map'].permute(0, 3, 1, 2)) # [1,96,120,160]->[1,192,60,80]->[1,384,30,40]->[1,768,15,20]
         # out = self.psp_head(feat)
         # ###################### encoding stages #############################
@@ -145,7 +147,7 @@ class FFB6D(nn.Module):
         intep = ops.Upsample(size=[h,w],mode='bilinear',align_corners=False)
         feat_final = intep(feat_up_fuse)
         
-        #import pdb;pdb.set_trace()
+        
         bs, di, _, _ = feat_final.size()
         feat_final = feat_final.view(bs, di, -1)
         choose_emb = inputs['choose'].repeat(1, di, 1)

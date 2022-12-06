@@ -9,11 +9,11 @@ from mmsegmentation.mmseg.models.backbones import swin
 from mmsegmentation.mmseg.models.decode_heads import uper_head
 from mmsegmentation.mmseg import ops
 
-# psp_models = {
-#     'resnet18': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='resnet18'),
-#     'resnet34': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='resnet34'),
-#     'resnet50': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet50'),
-# }
+psp_models = {
+    'resnet18': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='resnet18'),
+    'resnet34': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=512, deep_features_size=256, backend='resnet34'),
+    'resnet50': lambda: PSPNet(sizes=(1, 2, 3, 6), psp_size=2048, deep_features_size=1024, backend='resnet50'),
+}
 
 
 class FFB6D(nn.Module):
@@ -26,19 +26,92 @@ class FFB6D(nn.Module):
         self.n_cls = n_classes
         self.n_pts = n_pts
         self.n_kps = n_kps
-        
         self.swin_ffb = swin.SwinTransformer(patch_size=4)
         self.psp_head = uper_head.UPerHead(in_channels=[96,192,384,768],channels=256,in_index=[0,1,2,3],num_classes=2)
         self.psp_fuse_head = uper_head.UPerHead(in_channels=[192,384,768,1536],channels=256,in_index=[0,1,2,3],num_classes=2)
+        self.ds_rgb_swin = [96,192,384,768]
 
+        rndla = RandLANet(rndla_cfg)
+        self.rndla_pre_stages = rndla.fc0
 
+        # ####################### downsample stages#######################
+        # self.cnn_ds_stages = nn.ModuleList([
+        #     cnn.feats.layer1,    # stride = 1, [bs, 64, 120, 160]
+        #     cnn.feats.layer2,    # stride = 2, [bs, 128, 60, 80]
+        #     # stride = 1, [bs, 128, 60, 80]
+        #     nn.Sequential(cnn.feats.layer3, cnn.feats.layer4),
+        #     nn.Sequential(cnn.psp, cnn.drop_1)   # [bs, 1024, 60, 80]
+        # ])
+        self.ds_sr = [4, 8, 8, 8]
+        self.rndla_ds_stages = rndla.dilated_res_blocks
+        self.ds_rndla_oc = [item * 2 for item in rndla_cfg.d_out]
+        
+        # self.ds_fuse_rp_fuse_layers = nn.ModuleList()
+        # for i in range(4):
+        #     self.ds_fuse_rp_fuse_layers.append(
+        #         pt_utils.Conv2d(
+        #             self.ds_rgb_swin[i]+self.ds_rndla_oc[i], kernel_size=(1, 1),
+        #             bn=True
+        #         )
+        #     )
+        
+        self.fuse_emb = [192,384,768,1536]    
+
+        # ###################### upsample stages #############################
+        # self.cnn_up_stages = nn.ModuleList([
+        #     nn.Sequential(cnn.up_1, cnn.drop_2),  # [bs, 256, 120, 160]
+        #     nn.Sequential(cnn.up_2, cnn.drop_2),  # [bs, 64, 240, 320]
+        #     nn.Sequential(cnn.final),  # [bs, 64, 240, 320]
+        #     nn.Sequential(cnn.up_3, cnn.final)  # [bs, 64, 480, 640]
+        # ])
+        # self.up_rgb_oc = [256, 64, 64]
+        self.up_rndla_oc = []
+        for j in range(rndla_cfg.num_layers):
+            if j < 3:
+                self.up_rndla_oc.append(self.ds_rndla_oc[-j-2])
+            else:
+                self.up_rndla_oc.append(self.ds_rndla_oc[0])
+
+        self.rndla_up_stages = rndla.decoder_blocks
+
+        # n_fuse_layer = 3
+        # self.up_fuse_r2p_pre_layers = nn.ModuleList()
+        # self.up_fuse_r2p_fuse_layers = nn.ModuleList()
+        # self.up_fuse_p2r_pre_layers = nn.ModuleList()
+        # self.up_fuse_p2r_fuse_layers = nn.ModuleList()
+        # for i in range(n_fuse_layer):
+        #     self.up_fuse_r2p_pre_layers.append(
+        #         pt_utils.Conv2d(
+        #             self.up_rgb_oc[i], self.up_rndla_oc[i], kernel_size=(1, 1),
+        #             bn=True
+        #         )
+        #     )
+        #     self.up_fuse_r2p_fuse_layers.append(
+        #         pt_utils.Conv2d(
+        #             self.up_rndla_oc[i]*2, self.up_rndla_oc[i], kernel_size=(1, 1),
+        #             bn=True
+        #         )
+        #     )
+
+        #     self.up_fuse_p2r_pre_layers.append(
+        #         pt_utils.Conv2d(
+        #             self.up_rndla_oc[i], self.up_rgb_oc[i], kernel_size=(1, 1),
+        #             bn=True
+        #         )
+        #     )
+        #     self.up_fuse_p2r_fuse_layers.append(
+        #         pt_utils.Conv2d(
+        #             self.up_rgb_oc[i]*2, self.up_rgb_oc[i], kernel_size=(1, 1),
+        #             bn=True
+        #         )
+        #     )
 
         # ####################### prediction headers #############################
         # We use 3D keypoint prediction header for pose estimation following PVN3D
         # You can use different prediction headers for different downstream tasks.
 
         self.rgbd_seg_layer = (
-            pt_utils.Seq(256*3)
+            pt_utils.Seq(320)
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
@@ -46,7 +119,7 @@ class FFB6D(nn.Module):
         )
 
         self.ctr_ofst_layer = (
-            pt_utils.Seq(256*3)
+            pt_utils.Seq(320)
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
@@ -54,7 +127,7 @@ class FFB6D(nn.Module):
         )
 
         self.kp_ofst_layer = (
-            pt_utils.Seq(256*3)
+            pt_utils.Seq(320)
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
@@ -123,44 +196,67 @@ class FFB6D(nn.Module):
         # ###################### prepare stages #############################
         if not end_points:
             end_points = {}
-        
-        
         bs, _, h, w = inputs['nrm_angles'].shape
         feat_nrm = self.swin_ffb(inputs['nrm_angles']) # [1,96,120,160]->[1,192,60,80]->[1,384,30,40]->[1,768,15,20]
-        feat_xyz = self.swin_ffb(inputs['dpt_xyz_map'].permute(0, 3, 1, 2)) # [1,96,120,160]->[1,192,60,80]->[1,384,30,40]->[1,768,15,20]
-        # out = self.psp_head(feat)
-        # ###################### encoding stages #############################
-        ds_emb = []
-
+        p_emb = inputs['cld_angle_nrm']
+        p_emb = self.rndla_pre_stages(p_emb) #[1, 8, 19200, 1]
+        p_emb = p_emb.unsqueeze(dim=3)  # Batch*channel*npoints*1
+        ds_pc_emb = []
+        
         for i_ds in range(4):
-            rgb_emb0 = feat_nrm[i_ds]
-            p_emb0 = feat_xyz[i_ds]    
-            # concat img and point feauture as global features
-            ds_emb.append(torch.cat((rgb_emb0, p_emb0), dim=1))
+            # encode point cloud downsampled feature
+            f_encoder_i = self.rndla_ds_stages[i_ds](
+                p_emb, inputs['cld_xyz%d' % i_ds], inputs['cld_nei_idx%d' % i_ds]
+            ) # f_encoder_i.shape=[1, 64, 19200, 1] -> [1, 128, 4800, 1] -> [1, 256, 1200, 1] -> [1, 512, 300, 1]
+            
+            p_emb0 = self.random_sample(f_encoder_i, inputs['cld_sub_idx%d' % i_ds]) # [1, 64, 4800, 1] -> [1, 128, 1200, 1] ->[1, 256, 300, 1] -> [1, 512, 75, 1]
+            if i_ds == 0:
+                ds_pc_emb.append(f_encoder_i)
+            p_emb = p_emb0
+            ds_pc_emb.append(p_emb)
+        # ds_pc_emb: [1, 64, 19200, 1] -> [1, 64, 4800, 1] -> [1, 128, 1200, 1] -> [1, 256, 300, 1] -> [1, 512, 75, 1]
+
+        # ###################### decoding stages #############################
         
         feat_up_nrm = self.psp_head(feat_nrm)
-        feat_up_xyz = self.psp_head(feat_xyz)
-        feat_up_dsEmb = self.psp_fuse_head(ds_emb)
-        feat_up_fuse = torch.cat([feat_up_nrm, feat_up_xyz, feat_up_dsEmb], dim=1)
-        intep = ops.Upsample(size=[h,w],mode='bilinear',align_corners=False)
-        feat_final = intep(feat_up_fuse)
+        n_up_layers = len(self.rndla_up_stages)
+        for i_up in range(n_up_layers-1):
+            # decode point cloud upsampled feature
+            f_interp_i = self.nearest_interpolation(
+                p_emb, inputs['cld_interp_idx%d' % (n_up_layers-i_up-1)]
+            )# f_interp_i: [1, 512, 300, 1] -> [1, 256, 1200, 1] -> [1, 128, 4800, 1]
+            f_decoder_i = self.rndla_up_stages[i_up](
+                torch.cat([ds_pc_emb[-i_up - 2], f_interp_i], dim=1)
+            ) # f_decoder_i: [1, 256, 300, 1] -> [1, 128, 1200, 1] -> [1, 64, 4800, 1]
+            p_emb = f_decoder_i
+
         
-        #import pdb;pdb.set_trace()
-        bs, di, _, _ = feat_final.size()
-        feat_final = feat_final.view(bs, di, -1)
+        # final upsample layers:
+        f_interp_i = self.nearest_interpolation(
+            p_emb, inputs['cld_interp_idx%d' % (0)]
+        ) # f_interp_i: [1, 64, 19200, 1]
+        p_emb = self.rndla_up_stages[n_up_layers-1](
+            torch.cat([ds_pc_emb[0], f_interp_i], dim=1)
+        ).squeeze(-1) # p_emb: [1, 64, 19200]
+        
+        bs, di, _, _ = feat_up_nrm.size() # feat_up_nrm: [1, 256, 120, 160]
+        # feat_up_nrm = feat_up_nrm.view(bs, di, -1)
+        intep = ops.Upsample(size=[h,w],mode='bilinear',align_corners=False)
+        feat_final_nrm = intep(feat_up_nrm)
+        feat_final_nrm = feat_final_nrm.view(bs, di, -1)
         choose_emb = inputs['choose'].repeat(1, di, 1)
-        feat_final = torch.gather(feat_final, 2, choose_emb).contiguous()
+        nrm_emb_c = torch.gather(feat_final_nrm, 2, choose_emb).contiguous() # nrm_emb_c: [1, 256, 120, 160]
 
         # Use DenseFusion in final layer, which will hurt performance due to overfitting
         # rgbd_emb = self.fusion_layer(rgb_emb, pcld_emb)
-
-
         
+        # Use simple concatenation. Good enough for fully fused RGBD feature.
+        rgbd_emb = torch.cat([nrm_emb_c, p_emb], dim=1)
         
         # ###################### prediction stages #############################
-        rgbd_segs = self.rgbd_seg_layer(feat_final)
-        pred_kp_ofs = self.kp_ofst_layer(feat_final)
-        pred_ctr_ofs = self.ctr_ofst_layer(feat_final)
+        rgbd_segs = self.rgbd_seg_layer(rgbd_emb)
+        pred_kp_ofs = self.kp_ofst_layer(rgbd_emb)
+        pred_ctr_ofs = self.ctr_ofst_layer(rgbd_emb)
 
         pred_kp_ofs = pred_kp_ofs.view(
             bs, self.n_kps, 3, -1

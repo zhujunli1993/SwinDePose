@@ -558,6 +558,19 @@ class SwinTransformer(nn.Module):
             )
         )
         
+        pc_ds_0: List[nn.Module] = []
+        pc_ds_0.append(
+            nn.Sequential(
+                nn.Conv2d(
+                    3, embed_dim, kernel_size=(patch_size[0], patch_size[1]), stride=(patch_size[0], patch_size[1])
+                ),
+                Permute([0, 2, 3, 1]),
+                norm_layer(embed_dim),
+            )
+        )
+        pc_ds_1: List[nn.Module] = []
+        pc_ds_2: List[nn.Module] = []
+        pc_ds_3: List[nn.Module] = []  
         
         img_ds_0: List[nn.Module] = []
         img_ds_0.append(
@@ -603,30 +616,44 @@ class SwinTransformer(nn.Module):
             layers.append(nn.Sequential(*stage))
             if i_stage==0:
                 img_ds_0.append(nn.Sequential(*stage))
+                pc_ds_0.append(nn.Sequential(*stage))
             if i_stage==1:
                 img_ds_1.append(nn.Sequential(*stage))
+                pc_ds_1.append(nn.Sequential(*stage))
             if i_stage==2:
                 img_ds_2.append(nn.Sequential(*stage))
+                pc_ds_2.append(nn.Sequential(*stage))
             if i_stage==3:
                 img_ds_3.append(nn.Sequential(*stage)) 
+                pc_ds_3.append(nn.Sequential(*stage))
             
             # add patch merging layer
             if i_stage < (len(depths) - 1):
                 layers.append(downsample_layer(dim, norm_layer))
                 if i_stage==0:
                     img_ds_0.append(downsample_layer(dim, norm_layer))
+                    pc_ds_0.append(nn.Sequential(*stage))
                 if i_stage==1:
                     img_ds_1.append(downsample_layer(dim, norm_layer))
+                    pc_ds_1.append(nn.Sequential(*stage))
                 if i_stage==2:
                     img_ds_2.append(downsample_layer(dim, norm_layer))
+                    pc_ds_2.append(nn.Sequential(*stage))
                 if i_stage==3:
                     img_ds_3.append(downsample_layer(dim, norm_layer))
+                    pc_ds_3.append(nn.Sequential(*stage))
         
         self.img_ds_0 = nn.Sequential(*img_ds_0)
         self.img_ds_1 = nn.Sequential(*img_ds_1)
         self.img_ds_2 = nn.Sequential(*img_ds_2)
         self.img_ds_3 = nn.Sequential(*img_ds_3)
+
+        self.pc_ds_0 = nn.Sequential(*pc_ds_0)
+        self.pc_ds_1 = nn.Sequential(*pc_ds_1)
+        self.pc_ds_2 = nn.Sequential(*pc_ds_2)
+        self.pc_ds_3 = nn.Sequential(*pc_ds_3)
         
+                
         self.features = nn.Sequential(*layers)
         num_features = embed_dim * 2 ** (len(depths) - 1)
         self.norm = norm_layer(num_features)
@@ -643,6 +670,24 @@ class SwinTransformer(nn.Module):
 
     def forward(self, x):
         
+        x, hw_shape = self.patch_embed(x)
+        
+        if self.use_abs_pos_embed:
+            x = x + self.absolute_pos_embed
+        x = self.drop_after_pos(x)
+
+        outs = []
+        for i, stage in enumerate(self.stages):
+            x, hw_shape, out, out_hw_shape = stage(x, hw_shape)
+            if i in self.out_indices:
+                norm_layer = getattr(self, f'norm{i}')
+                out = norm_layer(out)
+                out = out.view(-1, *out_hw_shape,
+                               self.num_features[i]).permute(0, 3, 1,
+                                                             2).contiguous()
+                outs.append(out)
+        import pdb;pdb.set_trace()
+        
         x_0 = self.img_ds_0(x)
         x_1 = self.img_ds_1(x_0)
         x_2 = self.img_ds_2(x_1)
@@ -653,7 +698,7 @@ class SwinTransformer(nn.Module):
         x = self.avgpool(x)
         x = self.flatten(x)
         x = self.head(x)
-        return x
+        return outs
 
 
 def _swin_transformer(
