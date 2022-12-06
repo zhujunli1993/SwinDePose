@@ -25,7 +25,7 @@ class BaseOptions():
         g_data.add_argument('--test_list', type=str,  help='testing list.')
         g_data.add_argument('--lm_no_fuse', action='store_true', help='Not including fuse/ data when training as data augmentation.')
         g_data.add_argument('--lm_no_render', action='store_true', help='Not including render/ data when training as data augmentation.')
-        
+        g_data.add_argument('--lm_no_pbr', action='store_true', help='Not including render/ data when training as data augmentation.')
         # Experiment related
         g_exp = parser.add_argument_group('Experiment')
         g_exp.add_argument('--exp_dir', type=str, default='/workspace/REPO/pose_estimation', help='code directory')
@@ -72,6 +72,7 @@ class BaseOptions():
         g_train.add_argument('--crop', action='store_true', help='using cropped image as input.')
         g_train.add_argument('--max_w', type=int, default=200, help='max width for cropping')
         g_train.add_argument('--max_h', type=int, default=200, help='max height for cropping')
+        g_train.add_argument("--losses",nargs="+",type=str,default=["ADD", "quat"])
         # for eval
         parser.add_argument('--val_test_error', action='store_true', help='validate errors of test data')
         parser.add_argument('--eval_net', action='store_true', help="whether is to eval net.")
@@ -89,7 +90,7 @@ class BaseOptions():
         
         # Sampling related
         g_sample = parser.add_argument_group('Sampling')
-        g_sample.add_argument('--n_sample_points', type=int, default=480*640//24, help='number of input points, for ycbv dataset')
+        g_sample.add_argument('--n_sample_points', type=int, default=480*640//16, help='number of input points, for ycbv dataset')
         g_sample.add_argument('--n_keypoints', type=int, default=8, help='number of keypoints')
         g_sample.add_argument('--n_min_points', type=int, default=400, help='??')
         g_sample.add_argument('--noise_trans', type=float, default=0.05, help='range of the random noise of translation added to the training data')
