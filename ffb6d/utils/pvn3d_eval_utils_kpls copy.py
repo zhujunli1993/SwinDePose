@@ -219,7 +219,7 @@ def eval_one_frame_pose(
 # ###############################LineMOD Evaluation###############################
 
 def cal_frame_poses_lm(
-    pcld, mask, ctr_of, pred_kp_of, gt_kps, gt_ctr, use_ctr, n_cls, use_ctr_clus_flter, obj_id,
+    pcld, mask, ctr_of, pred_kp_of, gt_kps, gt_ctr, use_ctr, n_cls, use_ctr_clus_flter, obj_id, type, 
     debug=False
 ):
     """
@@ -279,6 +279,8 @@ def cal_frame_poses_lm(
             mesh_ctr = bs_utils_lm.get_ctr(obj_id, ds_type="linemod").reshape(1, 3)
             mesh_kps = np.concatenate((mesh_kps, mesh_ctr), axis=0)
         # mesh_kps = torch.from_numpy(mesh_kps.astype(np.float32)).cuda()
+
+            
         pred_RT = best_fit_transform(
             mesh_kps,
             cls_kps[cls_id].squeeze().contiguous().cpu().numpy()
@@ -322,10 +324,11 @@ def eval_one_frame_pose_lm(
 ):
     
     img_id, pcld, mask, ctr_of, pred_kp_of, gt_kp, gt_ctr, RTs, cls_ids, use_ctr, n_cls, \
-        min_cnt, use_ctr_clus_flter, label, epoch, ibs, obj_id = item
+        min_cnt, use_ctr_clus_flter, label, epoch, ibs, obj_id, type = item
+    
     pred_pose_lst, pred_kp, gt_kp, gt_ctr = cal_frame_poses_lm(
         pcld, mask, ctr_of, pred_kp_of, gt_kp, gt_ctr, use_ctr, n_cls, use_ctr_clus_flter,
-        obj_id
+        obj_id, type
     )
 
     cls_add_dis, cls_adds_dis = eval_metric_lm(
@@ -470,7 +473,7 @@ class TorchEval():
     def eval_pose_parallel(
         self, pclds, img_id, rgbs, masks, pred_ctr_ofs, gt_ctr_ofs, labels, cnt,
         cls_ids, RTs, pred_kp_ofs, gt_kps, gt_ctrs, min_cnt=20, merge_clus=False,
-        use_ctr_clus_flter=True, use_ctr=True, obj_id=0, kp_type='farthest',
+        use_ctr_clus_flter=True, use_ctr=True, obj_id=0, type=None, kp_type='farthest',
         ds='ycb'
     ):
         
@@ -495,7 +498,7 @@ class TorchEval():
             data_gen = zip(
                 img_id, pclds, masks, pred_ctr_ofs, pred_kp_ofs, gt_kps, gt_ctrs, RTs,
                 cls_ids, use_ctr_lst, n_cls_lst, min_cnt_lst, use_ctr_clus_flter_lst,
-                labels, epoch_lst, bs_lst, obj_id_lst
+                labels, epoch_lst, bs_lst, obj_id_lst, type
             )
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=bs
