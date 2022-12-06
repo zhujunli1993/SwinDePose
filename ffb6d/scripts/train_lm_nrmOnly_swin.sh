@@ -1,7 +1,7 @@
 #!/bin/bash
-GPU_NUM=0
+GPU_NUM=4
 GPU_COUNT=1
-NAME='vtesting'
+NAME='lm_swin_noSyn_phone_1_single'
 WANDB_PROJ='pose_estimation'
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
 CLS='phone'
@@ -11,7 +11,7 @@ SAVE_CHECKPOINT="$EXP_DIR/$NAME/$CLS/checkpoints"
 LOG_TRAININFO_DIR="$EXP_DIR/$NAME/$CLS/train_info"
 # checkpoint to resume. 
 #tst_mdl="train_log/linemod_half_pseang_1/checkpoints/${cls}/FFB6D_${cls}_best.pth.tar"
-python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 60005 apps/train_lm_nrmOnly_swin.py \
+python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 60009 apps/train_lm_nrmOnly_swin.py \
     --gpus=$GPU_COUNT \
     --wandb_proj $WANDB_PROJ \
     --wandb_name $NAME \
