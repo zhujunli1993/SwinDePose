@@ -30,10 +30,7 @@ python3 fuse.py --cls phone --fuse_num 10000
 ```
 To generate real/ normal angles images: Run the codes within the folder: datasets/linemod
 ```bash 
-python -m create_angle_npy.py \
---cls_num your_cls_num \
---train_list 'train.txt' \
---test_list 'test.txt'
+python -m create_angle_npy.py --cls_num your_cls_num --train_list 'train.txt' --test_list 'test.txt'
 ```
 
 Old codes: 
