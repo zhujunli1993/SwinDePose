@@ -24,6 +24,10 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import CyclicLR
 import torch.backends.cudnn as cudnn
 
+from ptflops import get_model_complexity_info
+from torchstat import stat
+from thop import profile
+
 import wandb
 
 from config.options import BaseOptions
@@ -193,7 +197,10 @@ def model_fn_decorator(
                     cu_dt[key] = data[key].long().cuda()
             
             end_points = model(cu_dt)
-            
+            # input = torch.randn(1, 3, 480, 640)
+            # input_p = torch.randn(1, 9, 19200)
+            # macs, params = profile(model, inputs=cu_dt)
+            # stat(model, (3, 480, 640))
             labels = cu_dt['labels']
             loss_rgbd_seg = criterion(
                 end_points['pred_rgbd_segs'], labels.view(-1)
@@ -620,6 +627,7 @@ def train():
         n_classes=config.n_objects, n_pts=opt.n_sample_points, rndla_cfg=rndla_cfg,
         n_kps=opt.n_keypoints
     )
+    
     model = convert_syncbn_model(model)
     device = torch.device('cuda:{}'.format(opt.local_rank))
     print('local_rank:', opt.local_rank)
@@ -631,7 +639,7 @@ def train():
     model, optimizer = amp.initialize(
         model, optimizer, opt_level=opt_level,
     )
-
+    
     # default value
     it = -1  # for the initialize value of `LambdaLR` and `BNMomentumScheduler`
     best_loss = 1e10

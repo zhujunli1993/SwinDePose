@@ -31,7 +31,7 @@ from config.options import BaseOptions
 from config.common import Config, ConfigRandLA
 
 import models.pytorch_utils as pt_utils
-from models.ffb6d_nrmOnly_swinBase_dense import FFB6D
+from models.ffb6d_nrmOnly_swinTiny_dense import FFB6D
 from models.loss import OFLoss, FocalLoss
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
@@ -519,9 +519,8 @@ class Trainer(object):
         patience = 7
         trigger_times = 0
         it = start_it
-
         for start_epoch in tqdm.tqdm(range(n_epochs)):
-
+            
             if train_sampler is not None:
                 train_sampler.set_epoch(start_epoch)
             # Reset numpy seed.
@@ -529,7 +528,6 @@ class Trainer(object):
             np.random.seed()
             if log_epoch_f is not None:
                 os.system("echo {} > {}".format(start_epoch, log_epoch_f))
-
             for batch in tqdm.tqdm(train_loader):
                 self.model.train()
 
@@ -540,9 +538,7 @@ class Trainer(object):
                     scaled_loss.backward()
 
                 self.optimizer.step()
-                
-                
-                
+
                 if self.lr_scheduler is not None:
                     self.lr_scheduler.step(it)
 
@@ -553,10 +549,9 @@ class Trainer(object):
                 
                 if self.viz is not None:
                     self.viz.update("train", it, res)
-                
-                
+
                 # eval_flag, eval_frequency = is_to_eval(start_epoch, it)
- 
+                
             
             if test_loader is not None:
                 if opt.eval_net:
@@ -581,7 +576,7 @@ class Trainer(object):
                 else:
                     trigger_times = 0
                 last_loss = current_loss
-
+        
         return val_loss
 
 
@@ -676,12 +671,17 @@ def train():
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[opt.local_rank], output_device=opt.local_rank,find_unused_parameters=True
         )
-        clr_div = 4
+        
+        
+        clr_div = 6 #clr_div=6
+        lr_scale = int(opt.n_total_epoch * train_ds.minibatch_per_epoch // clr_div // opt.gpus )
+        # lr_scale = opt.n_total_epoch * 10 // opt.gpus
+        # train_ds.minibatch_per_epoch= all_training_images//minibatch, clr_div=2, scale=60/2
         lr_scheduler = CyclicLR(
             optimizer, base_lr=1e-5, max_lr=1e-3,
             cycle_momentum=False,
-            step_size_up=opt.n_total_epoch * train_ds.minibatch_per_epoch // clr_div // opt.gpus,
-            step_size_down=opt.n_total_epoch * train_ds.minibatch_per_epoch // clr_div // opt.gpus,
+            step_size_up=lr_scale,
+            step_size_down=lr_scale,
             mode='triangular'
         )# train_ds.minibatch_per_epoch=30 if mini_batch_size=6; train_ds.minibatch_per_epoch=61 if mini_batch_size=3; train_ds.minibatch_per_epoch=46 if mini_batch_size=4
         
