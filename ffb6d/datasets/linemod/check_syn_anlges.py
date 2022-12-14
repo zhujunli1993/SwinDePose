@@ -1,4 +1,5 @@
 import numpy as np
+import tqdm
 def scale_pseudo(pseudo, idx):
         
     # Scale the pseudo angles and signed angles to image range (0 ~ 255) 
@@ -24,18 +25,18 @@ def scale_pseudo(pseudo, idx):
     
     return pseudo
     
-ren_path = '/workspace/DATA/Linemod_preprocessed/fuse_nrm/cat/file_list.txt'
+ren_path = '/workspace/DATA/Linemod_preprocessed/fuse_nrm/cam/file_list.txt'
 contents = np.loadtxt(ren_path, dtype='str')
-for file in contents:
+for file in tqdm.tqdm(contents):
     values = np.load(file)
     angle = values['angles']
     sed_angles = scale_pseudo(angle,file)
     if len(np.unique(sed_angles)) <= 1:
         print(file)
         
-ren_path = '/workspace/DATA/Linemod_preprocessed/renders_nrm/cat/file_list.txt'
+ren_path = '/workspace/DATA/Linemod_preprocessed/renders_nrm/cam/file_list.txt'
 contents = np.loadtxt(ren_path, dtype='str')
-for file in contents:
+for file in tqdm.tqdm(contents):
     values = np.load(file)
     angle = values['angles']
     sed_angles = scale_pseudo(angle,file)
