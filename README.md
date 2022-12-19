@@ -22,7 +22,7 @@ ln -s path_to_Linemod_preprocessed ./Linemod_preprocessed
 Don't have to do it every time. 
 3. Render renders_nrm/ data. For example, for phone class.
 ```bash 
-python3 rgbd_renderer.py --cls phone --render_num 20000
+python3 rgbd_renderer.py --cls phone --render_num 10000
 ```
 4. Render fuse_nrm/ data. For example, for phone class.
 ```bash 
