@@ -14,15 +14,18 @@ try:
     from neupeak.utils.webcv2 import imshow, waitKey
 except Exception:
     from cv2 import imshow, waitKey
-
+import pdb
 opt = BaseOptions().parse()
 if opt.dataset_name=='linemod':
     config_lm = Config(ds_name="linemod", cls_type=opt.linemod_cls)
     bs_utils_lm = Basic_Utils(config_lm)
-else:
+elif opt.dataset_name=='ycb':
     config = Config(ds_name='ycb')
     bs_utils = Basic_Utils(config)
     cls_lst = config.ycb_cls_lst
+else:
+    config_lm = Config(ds_name="occlusion_linemod", cls_type=opt.occ_linemod_cls)
+    bs_utils_lm = Basic_Utils(config_lm)
 
 
 
@@ -215,6 +218,103 @@ def eval_one_frame_pose(
 
 # ###############################End YCB Evaluation###############################
 
+# ################################Occlusion LineMod Evaluation########################
+def cal_frame_poses_occlm(
+    pcld, mask, ctr_of, pred_kp_of, gt_kps, gt_ctr, use_ctr, n_cls, use_ctr_clus_flter, obj_id,
+    debug=False
+):
+    """
+    Calculates pose parameters by 3D keypoints & center points voting to build
+    the 3D-3D corresponding then use least-squares fitting to get the pose parameters.
+    """
+    
+    n_kps, n_pts, _ = pred_kp_of.size()
+    pred_ctr = pcld - ctr_of[0]
+    pred_kp = pcld.view(1, n_pts, 3).repeat(n_kps, 1, 1) - pred_kp_of
+
+    radius = 0.04
+    if use_ctr:
+        cls_kps = torch.zeros(n_cls, n_kps+1, 3).cuda()
+    else:
+        cls_kps = torch.zeros(n_cls, n_kps, 3).cuda()
+
+    pred_pose_lst = []
+    cls_id = 1
+    cls_msk = mask == cls_id
+    if cls_msk.sum() < 1:
+        pred_pose_lst.append(np.identity(4)[:3, :])
+    else:
+        cls_voted_kps = pred_kp[:, cls_msk, :]
+        # for i in range(8):   
+        #     np.savetxt(str(i)+'_pred_kps_rgb.txt', cls_voted_kps[i,:,:].squeeze().cpu())
+        ms = MeanShiftTorch(bandwidth=radius)
+        ctr, ctr_labels = ms.fit(pred_ctr[cls_msk, :])
+        if ctr_labels.sum() < 1:
+            ctr_labels[0] = 1
+        if use_ctr:
+            cls_kps[cls_id, n_kps, :] = ctr
+
+        if use_ctr_clus_flter:
+            in_pred_kp = cls_voted_kps[:, ctr_labels, :]
+        else:
+            in_pred_kp = cls_voted_kps
+
+        for ikp, kps3d in enumerate(in_pred_kp):
+            cls_kps[cls_id, ikp, :], _ = ms.fit(kps3d)
+        
+        # visualize
+        # if True:
+        #     import pdb; pdb.set_trace()
+        #     show_kp_img = np.zeros((480, 640, 3), np.uint8)
+        #     kp_2ds = bs_utils_lm.project_p3d(
+        #         cls_kps[cls_id].cpu().numpy(), 1000.0, K='linemod'
+        #     )
+        #     color = (0, 0, 255)  # bs_utils.get_label_color(cls_id.item())
+        #     show_kp_img = bs_utils_lm.draw_p2ds(show_kp_img, kp_2ds, r=3, color=color)
+        #     # imshow("kp: cls_id=%d" % cls_id, show_kp_img)
+        #     cv2.imwrite('/workspace/REPO/pose_estimation/ffb6d/train_log/lm_1_pseudo/phone/eval_results/test.png', show_kp_img)
+        #     waitKey(0)
+        
+        mesh_kps = bs_utils_lm.get_kps(obj_id, ds_type="occlusion_linemod")
+        if use_ctr:
+            mesh_ctr = bs_utils_lm.get_ctr(obj_id, ds_type="occlusion_linemod").reshape(1, 3)
+            mesh_kps = np.concatenate((mesh_kps, mesh_ctr), axis=0)
+        # mesh_kps = torch.from_numpy(mesh_kps.astype(np.float32)).cuda()
+        pred_RT = best_fit_transform(
+            mesh_kps,
+            cls_kps[cls_id].squeeze().contiguous().cpu().numpy()
+        )
+        pred_pose_lst.append(pred_RT)
+        
+    return pred_pose_lst, cls_kps[cls_id].squeeze().contiguous().cpu().numpy(), gt_kps[0].squeeze().contiguous().cpu().numpy(), gt_ctr[0].squeeze().contiguous().cpu().numpy()
+
+def eval_metric_occlm(img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
+    n_cls = config_lm.n_classes
+    cls_add_dis = [list() for i in range(n_cls)]
+    cls_adds_dis = [list() for i in range(n_cls)]
+
+    pred_RT = pred_pose_lst[0]
+    pred_RT = torch.from_numpy(pred_RT.astype(np.float32)).cuda()
+    gt_RT = RTs[0]
+    mesh_pts = bs_utils_lm.get_pointxyz_cuda(obj_id, ds_type="occlusion_linemod").clone()
+    
+    # Check points transformed by predicted pose and GT pose, projecting them to 2D images
+    # bs_utils_lm.draw_points(img_id, opt.wandb_name, obj_id, opt.linemod_cls, pred_RT, mesh_pts)
+    
+    # Save points transformed by predicted pose and GT pose  
+    # bs_utils_lm.save_points(img_id, opt.wandb_name, opt.linemod_cls, pred_RT, gt_RT, mesh_pts)
+    
+    add = bs_utils_lm.cal_add_cuda(pred_RT, gt_RT, mesh_pts)
+    adds = bs_utils_lm.cal_adds_cuda(pred_RT, gt_RT, mesh_pts)
+    # print("obj_id:", obj_id, add, adds)
+    # cls_add_dis[obj_id].append(add.item())
+    # cls_adds_dis[obj_id].append(adds.item())
+    
+    cls_add_dis[0].append(add.item())
+    cls_adds_dis[0].append(adds.item())
+
+    return (cls_add_dis, cls_adds_dis)
+
 
 # ###############################LineMOD Evaluation###############################
 
@@ -333,6 +433,22 @@ def eval_one_frame_pose_lm(
     )
     return (cls_add_dis, cls_adds_dis, pred_kp, gt_kp, gt_ctr)
 
+
+def eval_one_frame_pose_occlm(
+    item
+):
+    
+    img_id, pcld, mask, ctr_of, pred_kp_of, gt_kp, gt_ctr, RTs, cls_ids, use_ctr, n_cls, \
+        min_cnt, use_ctr_clus_flter, label, epoch, ibs, obj_id = item
+    pred_pose_lst, pred_kp, gt_kp, gt_ctr = cal_frame_poses_occlm(
+        pcld, mask, ctr_of, pred_kp_of, gt_kp, gt_ctr, use_ctr, n_cls, use_ctr_clus_flter,
+        obj_id
+    )
+
+    cls_add_dis, cls_adds_dis = eval_metric_occlm(
+         img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id
+    )
+    return (cls_add_dis, cls_adds_dis, pred_kp, gt_kp, gt_ctr)
 # ###############################End LineMOD Evaluation###############################
 
 
@@ -344,10 +460,12 @@ class TorchEval():
         if opt.dataset_name=='linemod':
             n_cls=2
             self.n_cls=2
-        else:
+        elif opt.dataset_name=="ycb":
             n_cls = 22
             self.n_cls = 22
-        
+        else:
+            n_cls=2
+            self.n_cls=2
         self.cls_add_dis = [list() for i in range(n_cls)]
         self.cls_adds_dis = [list() for i in range(n_cls)]
         self.cls_add_s_dis = [list() for i in range(n_cls)]
@@ -503,8 +621,10 @@ class TorchEval():
         
             if ds == "ycb":
                 eval_func = eval_one_frame_pose
-            else:
+            elif ds == "linemod":
                 eval_func = eval_one_frame_pose_lm
+            else:
+                eval_func = eval_one_frame_pose_occlm
             for res in executor.map(eval_func, data_gen):
                 if ds == 'ycb':
                     cls_add_dis_lst, cls_adds_dis_lst, pred_cls_ids, pred_poses, pred_kp_errs = res
@@ -514,7 +634,10 @@ class TorchEval():
                     self.pred_kp_errs = self.merge_lst(
                         self.pred_kp_errs, pred_kp_errs
                     )
+                elif ds == "linemod":
+                    cls_add_dis_lst, cls_adds_dis_lst, pred_kp, gt_kp, gt_ctr = res
                 else:
+                    
                     cls_add_dis_lst, cls_adds_dis_lst, pred_kp, gt_kp, gt_ctr = res
                 
                 self.cls_add_dis = self.merge_lst(

@@ -25,7 +25,7 @@ def scale_pseudo(pseudo, idx):
     
     return pseudo
     
-ren_path = '/workspace/DATA/Linemod_preprocessed/fuse_nrm/cam/file_list.txt'
+ren_path = '/workspace/DATA/Linemod_preprocessed/fuse_nrm/driller/file_list.txt'
 contents = np.loadtxt(ren_path, dtype='str')
 for file in tqdm.tqdm(contents):
     values = np.load(file)
@@ -34,7 +34,7 @@ for file in tqdm.tqdm(contents):
     if len(np.unique(sed_angles)) <= 1:
         print(file)
         
-ren_path = '/workspace/DATA/Linemod_preprocessed/renders_nrm/cam/file_list.txt'
+ren_path = '/workspace/DATA/Linemod_preprocessed/renders_nrm/driller/file_list.txt'
 contents = np.loadtxt(ren_path, dtype='str')
 for file in tqdm.tqdm(contents):
     values = np.load(file)

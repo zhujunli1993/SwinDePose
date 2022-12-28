@@ -11,9 +11,11 @@ class BaseOptions():
     def initialize(self, parser):
         # Datasets related
         g_data = parser.add_argument_group('Data')
-        g_data.add_argument('--dataset_name', type=str, default='ycb', help='dataset name: ycb | linemod')
+        g_data.add_argument('--dataset_name', type=str, default='ycb', help='dataset name: ycb | linemod | occlusion_linemod')
         g_data.add_argument('--linemod_cls', type=str, default='ape', help='linemod class label: ape, benchvise, cam, can, cat, driller\
                                             duck,eggbox, glue, holepuncher, iron, lamp, phone')
+        g_data.add_argument('--occ_linemod_cls', type=str, default='ape', help='occlusion linemod class label: ape, can, cat, driller\
+                                            duck, eggbox, glue, holepuncher')
         g_data.add_argument('--syn', action='store_true', help='Generate YCBV synthetic pseudo images')
         g_data.add_argument('--real', action='store_true', help='Generate YCBV real pseudo images')
         g_data.add_argument('--width', type=int, default=640, help='YCBV image width, default = 640')

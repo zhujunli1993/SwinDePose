@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -240,10 +241,23 @@ class FFB6D(nn.Module):
             torch.cat([ds_pc_emb[0], f_interp_i], dim=1)
         ).squeeze(-1) # p_emb: [1, 64, 19200]
         
+        # # For data visualization
+        # import pdb;pdb.set_trace()
+        # id_ind = str(int(inputs['img_id'].cpu().numpy()[0]))
+        
+        # torch.save(inputs['cld_angle_nrm'], os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_pc.pt'))
+        # torch.save(feat_up_nrm, os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_small_img.pt'))
+        
+        
         bs, di, _, _ = feat_up_nrm.size() # feat_up_nrm: [1, 256, 120, 160]
         # feat_up_nrm = feat_up_nrm.view(bs, di, -1)
         intep = ops.Upsample(size=[h,w],mode='bilinear',align_corners=False)
         feat_final_nrm = intep(feat_up_nrm)
+        
+        # # For data visualization
+        
+        # torch.save(feat_final_nrm, os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_img.pt'))
+        
         feat_final_nrm = feat_final_nrm.view(bs, di, -1)
         choose_emb = inputs['choose'].repeat(1, di, 1)
         nrm_emb_c = torch.gather(feat_final_nrm, 2, choose_emb).contiguous() # nrm_emb_c: [1, 256, 120, 160]
@@ -253,6 +267,12 @@ class FFB6D(nn.Module):
         
         # Use simple concatenation. Good enough for fully fused RGBD feature.
         rgbd_emb = torch.cat([nrm_emb_c, p_emb], dim=1)
+        
+        
+        # # # For data visualization
+        # torch.save(rgbd_emb, os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_img_pc.pt'))
+        # torch.save(nrm_emb_c, os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_img_final.pt'))
+        # torch.save(p_emb, os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_pc_final.pt'))
         
         # ###################### prediction stages #############################
         rgbd_segs = self.rgbd_seg_layer(rgbd_emb)
@@ -271,6 +291,8 @@ class FFB6D(nn.Module):
         end_points['pred_kp_ofs'] = pred_kp_ofs
         end_points['pred_ctr_ofs'] = pred_ctr_ofs
 
+        
+        
         return end_points
 
 

@@ -736,6 +736,7 @@ class SwinTransformer(BaseModule):
             load_state_dict(self, state_dict, strict=False, logger=logger)
 
     def forward(self, x):
+        
         x, hw_shape = self.patch_embed(x)
 
         if self.use_abs_pos_embed:
