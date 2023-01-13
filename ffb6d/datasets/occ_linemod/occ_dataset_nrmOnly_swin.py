@@ -12,7 +12,7 @@ import pickle as pkl
 from utils.basic_utils import Basic_Utils
 import yaml
 import scipy.io as scio
-import scipy.misc
+import json
 from glob import glob
 import normalSpeed
 from models.RandLA.helper_tool import DataProcessing as DP
@@ -28,9 +28,10 @@ bs_utils_fill = Basic_Utils(config_fill)
 class Dataset():
 
     def __init__(self, dataset_name, cls_type="duck", DEBUG=False):
+        
         self.DEBUG = DEBUG
         self.opt = BaseOptions().parse()
-        self.config = Config(ds_name=dataset_name, cls_type=self.opt.occ_linemod_cls)
+        self.config = Config(ds_name=self.opt.dataset_name, cls_type=self.opt.occ_linemod_cls)
         self.bs_utils = Basic_Utils(self.config)
         self.dataset_name = dataset_name
         self.xmap = np.array([[j for i in range(self.opt.width)] for j in range(self.opt.height)])
@@ -42,46 +43,16 @@ class Dataset():
         self.cls_type = cls_type
         
         self.cls_id = self.config.cls_id
-        print("cls_id in lm_dataset.py", self.cls_id)
-        self.root = self.config.lm_root
-        self.cls_root = self.config.cls_root
+        print("cls_id in lmo_dataset.py", self.cls_id)
+        self.root = self.config.occ_lm_root
+        # self.cls_root = self.config.cls_root
         self.rng = np.random
-        meta_file = open(os.path.join(self.cls_root, 'gt.yml'), "r")
-        self.meta_lst = yaml.safe_load(meta_file)
         if dataset_name == 'train':
             self.add_noise = True
             real_img_pth = self.config.train_path
             self.real_lst = self.bs_utils.read_lines(real_img_pth)
-            
-            if not self.opt.lm_no_render:
-                self.rnd_lst = self.bs_utils.read_lines(self.config.render_files)
-                # rnd_img_ptn = self.config.render_path
-                # self.rnd_lst = glob(rnd_img_ptn)
-            # Remove render images
-            else:
-                self.rnd_lst=[]
-            
-            print("render data length: ", len(self.rnd_lst))
-            if len(self.rnd_lst) == 0:
-                warning = "Warning: "
-                warning += "Trainnig without rendered data will hurt model performance \n"
-                warning += "Please generate rendered data from https://github.com/ethnhe/raster_triangle.\n"
-                print(warning)
-            
-            if not self.opt.lm_no_fuse:
-                self.fuse_lst = self.bs_utils.read_lines(self.config.fuse_files)
-                # fuse_img_ptn = self.config.fuse_path
-                # self.fuse_lst = glob(fuse_img_ptn)
-            # Remove fuse images
-            else:
-                self.fuse_lst=[]
-            print("fused data length: ", len(self.fuse_lst))
-            if len(self.fuse_lst) == 0:
-                warning = "Warning: "
-                warning += "Trainnig without fused data will hurt model performance \n"
-                warning += "Please generate fused data from https://github.com/ethnhe/raster_triangle.\n"
-                print(warning)
-
+            self.rnd_lst=[]
+            self.fuse_lst=[]
             self.all_lst = self.real_lst + self.rnd_lst + self.fuse_lst
             self.minibatch_per_epoch = len(self.all_lst) //  self.opt.mini_batch_size
         else:
@@ -194,49 +165,51 @@ class Dataset():
 
         return np.clip(img, 0, 255).astype(np.uint8)
 
-    def add_real_back(self, rgb, labels, dpt, dpt_msk):
-        real_item = self.real_gen()
-        with Image.open(os.path.join(self.cls_root, "depth", real_item+'.png')) as di:
-            real_dpt = np.array(di)
-        with Image.open(os.path.join(self.cls_root, "mask", real_item+'.png')) as li:
-            bk_label = np.array(li)
-        bk_label = (bk_label < 255).astype(rgb.dtype)
-        # bk_label_3c = np.repeat(bk_label[:, :, None], 3, 2)
-        if len(bk_label.shape) > 2:
-            bk_label = bk_label[:, :, 0]
-        # Add pseudo-background
-        with np.load(os.path.join(self.cls_root, "pseudo_nrm_angles/{}.npz".format(real_item))) as data:
-            angles = data['angles']
+    # def add_real_back(self, rgb, labels, dpt, dpt_msk):
+    #     real_item = self.real_gen()
+    #     with Image.open(os.path.join(self.cls_root, "depth", real_item+'.png')) as di:
+    #         real_dpt = np.array(di)
+    #     with Image.open(os.path.join(self.cls_root, "mask", real_item+'.png')) as li:
+    #         bk_label = np.array(li)
+    #     bk_label = (bk_label < 255).astype(rgb.dtype)
+    #     # bk_label_3c = np.repeat(bk_label[:, :, None], 3, 2)
+    #     if len(bk_label.shape) > 2:
+    #         bk_label = bk_label[:, :, 0]
+    #     # Add pseudo-background
+    #     with np.load(os.path.join(self.cls_root, "pseudo_nrm_angles/{}.npz".format(real_item))) as data:
+    #         angles = data['angles']
             
-            # convert angles and signed angles to image range (0~255)
-            sed_angles = self.scale_pseudo(angles)
+    #         # convert angles and signed angles to image range (0~255)
+    #         sed_angles = self.scale_pseudo(angles)
             
-            sed_angles = Image.fromarray(np.uint8(sed_angles))
+    #         sed_angles = Image.fromarray(np.uint8(sed_angles))
             
-            back = np.array(sed_angles)[:, :, :3] * bk_label[:, :, None]
+    #         back = np.array(sed_angles)[:, :, :3] * bk_label[:, :, None]
            
         
-        # Add real-RGB background
-        # with Image.open(os.path.join(self.cls_root, "rgb", real_item+'.png')) as ri:
-        #     back_r = np.array(ri)[:, :, :3] * bk_label[:, :, None]
+    #     # Add real-RGB background
+    #     # with Image.open(os.path.join(self.cls_root, "rgb", real_item+'.png')) as ri:
+    #     #     back_r = np.array(ri)[:, :, :3] * bk_label[:, :, None]
         
         
-        dpt_back = real_dpt.astype(np.float32) * bk_label.astype(np.float32)
+    #     dpt_back = real_dpt.astype(np.float32) * bk_label.astype(np.float32)
         
-        if self.rng.rand() < 0.6:
-            msk_back = (labels <= 0).astype(rgb.dtype)
-            msk_back = np.repeat(msk_back[:, :, None], 3, 2)
-            rgb = rgb * (msk_back == 0).astype(rgb.dtype) + back * msk_back
+    #     if self.rng.rand() < 0.6:
+    #         msk_back = (labels <= 0).astype(rgb.dtype)
+    #         msk_back = np.repeat(msk_back[:, :, None], 3, 2)
+    #         rgb = rgb * (msk_back == 0).astype(rgb.dtype) + back * msk_back
         
         
-        dpt = dpt * (dpt_msk > 0).astype(dpt.dtype) + \
-            dpt_back * (dpt_msk <= 0).astype(dpt.dtype)
-        return rgb, dpt
+    #     dpt = dpt * (dpt_msk > 0).astype(dpt.dtype) + \
+    #         dpt_back * (dpt_msk <= 0).astype(dpt.dtype)
+    #     return rgb, dpt
 
     def dpt_2_pcld(self, dpt, cam_scale, K):
+        
         if len(dpt.shape) > 2:
             dpt = dpt[:, :, 0]
         dpt = dpt.astype(np.float32) / cam_scale
+        # msk = (dpt < 6e1).astype(np.float32)
         msk = (dpt > 1e-8).astype(np.float32)
         row = (self.ymap - K[0][2]) * dpt / K[0][0]
         col = (self.xmap - K[1][2]) * dpt / K[1][1]
@@ -270,83 +243,86 @@ class Dataset():
 
     def get_item(self, item_name):
         
-        if ".npz" in item_name:
-            #item_name_full = os.path.join(self.config.lm_root, item_name)
-            data = np.load(item_name) 
-            dpt_mm = data['depth'] * 1000.
-            angles = data['angles'] # data['rgb'] actually contains pseudo angles image with background
-            # convert angles and signed angles to image range (0~255)
-            sed_angles = self.scale_pseudo(angles)
-            sed_angles = Image.fromarray(np.uint8(sed_angles))
-
-            cam_scale = 1000.0
-            nrm_angles = np.float32(sed_angles)
-            labels = data['mask']
-            K = data['K']
-            RT = data['RT']
-            rnd_typ = data['rnd_typ']
-            if rnd_typ == "fuse":
-                labels = (labels == self.cls_id).astype("uint8")
-            else:
-                labels = (labels > 0).astype("uint8")
-        else:
-        
-            with Image.open(os.path.join(self.cls_root, "depth/{}.png".format(item_name))) as di:
-                dpt_mm = np.array(di)
-            with Image.open(os.path.join(self.cls_root, "mask/{}.png".format(item_name))) as li:
+        if self.dataset_name=='train':
+            scene_id = item_name.split('/')[5]
+            img_id = item_name.split('/')[-1].split('_')[0]
+            msk_id = item_name.split('/')[-1]
+            with Image.open(os.path.join(self.root, 'train_pbr',scene_id, "depth","{}.png".format(img_id))) as di:
+                dpt_mm = np.array(di)*0.1
+            with Image.open(os.path.join(self.root, 'train_pbr',scene_id, "mask_visib",msk_id)) as li:
                 labels = np.array(li)
                 labels = (labels > 0).astype("uint8")
-            #with Image.open(os.path.join(self.cls_root, "pseudo_angles/{}.png".format(item_name))) as ri:
             
-            with np.load(os.path.join(self.cls_root, "pseudo_nrm_angles/{}.npz".format(item_name))) as data:
+            with np.load(os.path.join(self.root, 'train_pbr',scene_id, "pseudo_nrm_angles","{}.npz".format(img_id))) as data:
                 angles = data['angles']
                 
                 # convert angles and signed angles to image range (0~255)
                 sed_angles = self.scale_pseudo(angles)
-                # if True:
-                #     import pdb;pdb.set_trace()
-                #     img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data','15','vis_angles_training_noNoise{}.png'.format(item_name))
-                #     cv2.imwrite(img_file, sed_angles)
-                # valid_msk = ~np.all(angles == np.array([360,360,360]), axis=-1)
-                # valid_index = np.where(valid_msk==True)
                 sed_angles = Image.fromarray(np.uint8(sed_angles))
                 
                 if self.add_noise:
                     sed_angles = self.trancolor(sed_angles)
                 nrm_angles = np.array(sed_angles)[:, :, :3]
-                # if True:
-                #     img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data','15','vis_angles_training_Noise{}.png'.format(item_name))
-                #     cv2.imwrite(img_file, nrm_angles)
-            #with Image.open(os.path.join(self.cls_root, "pseudo_signed/{}.png".format(item_name))) as rs:
-                
-            #valid_dpt_mm = np.ma.masked_array(dpt_mm, valid_msk)
-
-            item_name = str(int(item_name))
-            meta = self.meta_lst[item_name]
-            if self.cls_id == 2:
-                for i in range(0, len(meta)):
-                    if meta[i]['obj_id'] == 2:
-                        meta = meta[i]
-                        break
-            else:
-                meta = meta[0]
+            
+            meta_pth = os.path.join(self.root,'train_pbr',scene_id, 'scene_gt.json')
+            f = open(meta_pth)
+            infos = json.load(f)[str(int(img_id))]
+            info_ind = int(msk_id.split('_')[-1].split('.')[0])
+            meta = infos[info_ind]
             R = np.resize(np.array(meta['cam_R_m2c']), (3, 3))
             T = np.array(meta['cam_t_m2c']) / 1000.0
             RT = np.concatenate((R, T[:, None]), axis=1)
-            rnd_typ = 'real'
+            # rnd_typ = 'real'
+            
             K = self.config.intrinsic_matrix["linemod"]
             cam_scale = 1000.0
             
             dpt_mm = bs_utils_fill.fill_missing(dpt_mm, cam_scale, 1)
-            # dpt_mm_rgb = dpt_mm.copy()
-            # second_min = np.unique(dpt_mm_rgb)[1]
-            # index = np.where(dpt_mm_rgb==0)
+        else:
             
-            # factor = 254. / (np.max(dpt_mm_rgb)-second_min)
-            # dpt_mm_rgb = factor * (dpt_mm_rgb - second_min)
-            # dpt_mm_rgb[index] = 255
+            scene_id = item_name.split('/')[5]
+            img_id = item_name.split('/')[-1].split('_')[0]
+            msk_id = item_name.split('/')[-1]
+            with Image.open(os.path.join(self.root, 'test',scene_id, "depth","{}.png".format(img_id))) as di:
+                dpt_mm = np.array(di) 
+            with Image.open(os.path.join(self.root, 'test',scene_id, "mask_visib",msk_id)) as li:
+                labels = np.array(li)
+                labels = (labels > 0).astype("uint8")
             
+            with np.load(os.path.join(self.root, 'test',scene_id, "pseudo_nrm_angles","{}.npz".format(img_id))) as data:
+                angles = data['angles']
+                
+                # convert angles and signed angles to image range (0~255)
+                sed_angles = self.scale_pseudo(angles)
+                sed_angles = Image.fromarray(np.uint8(sed_angles))
+                
+                if self.add_noise:
+                    sed_angles = self.trancolor(sed_angles)
+                nrm_angles = np.array(sed_angles)[:, :, :3]
+            
+            meta_pth = os.path.join(self.root,'test',scene_id, 'scene_gt.json')
+            f = open(meta_pth)
+            infos = json.load(f)[str(int(img_id))]
+            info_ind = int(msk_id.split('_')[-1].split('.')[0])
+            meta = infos[info_ind]
+            R = np.resize(np.array(meta['cam_R_m2c']), (3, 3))
+            T = np.array(meta['cam_t_m2c']) / 1000.0
+            RT = np.concatenate((R, T[:, None]), axis=1)
+            # rnd_typ = 'real'
+            
+            K = self.config.intrinsic_matrix["linemod"]
+            cam_scale = 1000.0
+            
+            dpt_mm = bs_utils_fill.fill_missing(dpt_mm, cam_scale, 1)
+        # dpt_mm_rgb = dpt_mm.copy()
+        # second_min = np.unique(dpt_mm_rgb)[1]
+        # index = np.where(dpt_mm_rgb==0)
         
+        # factor = 254. / (np.max(dpt_mm_rgb)-second_min)
+        # dpt_mm_rgb = factor * (dpt_mm_rgb - second_min)
+        # dpt_mm_rgb[index] = 255
+        
+
         dpt_mm = dpt_mm.copy().astype(np.uint16)
         nrm_map = normalSpeed.depth_normal(
             dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False
@@ -354,7 +330,7 @@ class Dataset():
         # if self.DEBUG:
         #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
         #     imshow("nrm_map", show_nrm_map)
-
+        
         dpt_m = dpt_mm.astype(np.float32) / cam_scale
         dpt_xyz = self.dpt_2_pcld(dpt_m, 1.0, K)
         dpt_xyz[np.isnan(dpt_xyz)] = 0.0
@@ -365,14 +341,14 @@ class Dataset():
             labels = labels[:, :, 0]
         rgb_labels = labels.copy()
 
-        if self.add_noise and rnd_typ != 'real':
-            if rnd_typ == 'render' or self.rng.rand() < 0.8:
-                nrm_angles = self.rgb_add_noise(nrm_angles)
-                rgb_labels = labels.copy()
-                msk_dp = dpt_mm > 1e-6
-                nrm_angles, dpt_mm = self.add_real_back(nrm_angles, rgb_labels, dpt_mm, msk_dp)
-            if self.rng.rand() > 0.8:
-                nrm_angles = self.rgb_add_noise(nrm_angles)
+        # if self.add_noise and rnd_typ != 'real':
+        #     if rnd_typ == 'render' or self.rng.rand() < 0.8:
+        #         nrm_angles = self.rgb_add_noise(nrm_angles)
+        #         # rgb_labels = labels.copy()
+        #         # msk_dp = dpt_mm > 1e-6
+        #         # nrm_angles, dpt_mm = self.add_real_back(nrm_angles, rgb_labels, dpt_mm, msk_dp)
+        #     if self.rng.rand() > 0.8:
+        #         nrm_angles = self.rgb_add_noise(nrm_angles)
 
     
 
@@ -490,10 +466,9 @@ class Dataset():
         #     "cls_ids:", cls_ids, "\n",
         #     "labels.unique:", np.unique(labels),
         # )
-        if ".npz" in item_name:
-            item_name = item_name.split('/')[-1].split('.')[0]
+
         item_dict = dict(
-            img_id=np.uint8(item_name),
+            # img_id=np.uint8(scene_id),
             nrm_angles=nrm_angles.astype(np.uint8),  # [c, h, w]
             cld_angle_nrm=cld_angle_nrm.astype(np.float32),  # [9, npts]
             choose=choose.astype(np.int32),  # [1, npts]
@@ -519,6 +494,7 @@ class Dataset():
         return item_dict
 
     def get_pose_gt_info(self, cld, labels, RT):
+        
         RTs = np.zeros((self.config.n_objects, 3, 4))
         kp3ds = np.zeros((self.config.n_objects, self.opt.n_keypoints, 3))
         ctr3ds = np.zeros((self.config.n_objects, 3))
@@ -529,8 +505,8 @@ class Dataset():
             RTs[i] = RT
             r = RT[:, :3]
             t = RT[:, 3]
-
-            ctr = self.bs_utils.get_ctr(self.cls_type, ds_type="linemod")[:, None]
+            
+            ctr = self.bs_utils.get_ctr(self.cls_type, ds_type="occlusion_linemod")[:, None]
             ctr = np.dot(ctr.T, r.T) + t
             ctr3ds[i, :] = ctr[0]
             msk_idx = np.where(labels == cls_id)[0]
@@ -545,7 +521,7 @@ class Dataset():
             else:
                 kp_type = 'farthest{}'.format(self.opt.n_keypoints)
             kps = self.bs_utils.get_kps(
-                self.cls_type, kp_type=kp_type, ds_type='linemod'
+                self.cls_type, kp_type=kp_type, ds_type='occlusion_linemod'
             )
             kps = np.dot(kps, r.T) + t
             kp3ds[i] = kps

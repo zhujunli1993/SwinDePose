@@ -9,7 +9,8 @@ import normalSpeed
 import json
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
-import pdb
+# import scipy.io as scio
+
 import depth_map_utils_ycb as depth_map_utils
 
 # def curv(points):
@@ -20,14 +21,15 @@ import depth_map_utils_ycb as depth_map_utils
 
 parser = ArgumentParser()
 
-# parser.add_argument(
-#     '--train_list', type=str, 
-#     help="training list for real/ generation."
-# )
-# parser.add_argument(
-#     '--test_list', type=str, 
-#     help="testing list for real/ generation."
-# )
+
+parser.add_argument(
+    '--train_list', type=str, 
+    help="training list for real/ generation."
+)
+parser.add_argument(
+    '--test_list', type=str, 
+    help="testing list for real/ generation."
+)
 parser.add_argument(
     '--vis_img', action="store_true",
     help="visulaize histogram."
@@ -297,39 +299,46 @@ def pseudo_gen(args, dpt_xyz):
     
     return new_img_angles
 
+ycb_K1 = np.array([[1066.778, 0.        , 312.9869],
+                    [0.      , 1067.487  , 241.3109],
+                    [0.      , 0.        , 1.0]], np.float32)
+ycb_K2 = np.array([[1077.836, 0.        , 323.7872],
+                    [0.      , 1078.189  , 279.6921],
+                    [0.      , 0.        , 1.0]], np.float32)
+trainlist = np.loadtxt(os.path.join('/workspace/DATA/YCBV',args.train_list),dtype='str')
+testlist = np.loadtxt(os.path.join('/workspace/DATA/YCBV',args.test_list),dtype='str')
 
 
-# testlist = np.loadtxt(os.path.join('/workspace/DATA/Occ_LineMod','test',args.test_list),dtype='str')
 
-K=np.array([[572.4114, 0.,         325.2611],
-            [0.,        573.57043,  242.04899],
-            [0.,        0.,         1.]])
-# meta_file = open(os.path.join('/workspace/DATA/Occ_Linemod/data',args.cls_num, 'gt.yml'), "r")
-
-# meta_lst = yaml.safe_load(meta_file)
-
-################################################### For pbr data ###########################################
-for scene_id in tqdm.tqdm(range(10)):
-    scene_id = str(scene_id).zfill(6)
+for item_name in tqdm.tqdm(trainlist):
     
-    for item_name in tqdm.tqdm(range(1000)):
-        item_name = str(item_name).zfill(6)
-        
-        with Image.open(os.path.join('/workspace/DATA/Occ_LineMod','train_pbr',scene_id,"depth/{}.png".format(item_name))) as di:
-            dpt_mm = np.array(di)
-        
-        
-        dpt_mm = dpt_mm * 0.1
-        cam_scale = 1000.0
-        dpt_mm = fill_missing(dpt_mm, cam_scale, 1)
+    f_idx = item_name.split('/')[1]
+    data_type = item_name.split('/')[0]
+    
+    if data_type != 'data_syn':
+        i_idx = item_name.split('/')[2]
+        if int(f_idx) >= 60:
+            K = ycb_K2
+        else:
+            K = ycb_K1
+            
+        with Image.open(os.path.join('/workspace/DATA/YCBV',data_type, f_idx, i_idx+"-depth.png")) as di:
+            dpt_um = np.array(di)
 
-        dpt_mm = dpt_mm.copy().astype(np.uint16)
+        # meta = scio.loadmat(os.path.join('/workspace/DATA/YCBV',data_type, f_idx, i_idx+'-meta.mat'))
+        
+        # cam_scale = meta['factor_depth'].astype(np.float32)[0][0]
+        cam_scale=10000.
+        dpt_um = fill_missing(dpt_um, cam_scale, 1)
+
+        dpt_mm = (dpt_um.copy()/10).astype(np.uint16)
         nrm_map = normalSpeed.depth_normal(dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False)
 
         # if True:
         #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
         #     img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_nrm_{}.png'.format(item_name))
         #     cv2.imwrite(img_file, show_nrm_map)
+        
         # dpt_m = dpt_mm.astype(np.float32) / cam_scale
         # dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
         # dpt_xyz[np.isnan(dpt_xyz)] = 0.0
@@ -337,34 +346,146 @@ for scene_id in tqdm.tqdm(range(10)):
 
         
         # rgb = pseudo_gen(args, dpt_xyz)
-        rgb_nrm = pseudo_nrm_angle( nrm_map)
+        rgb_nrm = pseudo_nrm_angle(nrm_map)
         
         if args.vis_img:
             
-            # img_file = os.path.join('/workspace/DATA/Occ_Linemod/data',args.cls_num,'vis_cur_{}.png'.format(item_name))
+            # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_cur_{}.png'.format(item_name))
             # cv2.imwrite(img_file, surface_curvature)
             # # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
             # # cv2.imwrite(img_file, rgb_s)
-            # print('Please look at /workspace/DATA/Occ_Linemod/data/your_class/angles_or_signed_itemname.png')
-            # img_file = os.path.join('/workspace/DATA/Occ_Linemod/data',args.cls_num,'vis_angles_{}.png'.format(item_name))
+            # print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
+            # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_angles_{}.png'.format(item_name))
             # cv2.imwrite(img_file, rgb)
-            # # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
-            # # cv2.imwrite(img_file, rgb_s)
-            # print('Please look at /workspace/DATA/Occ_Linemod/data/your_class/angles_or_signed_itemname.png')
-            img_file = os.path.join('/workspace/DATA/Occ_LineMod','train_pbr','vis_nrm_angles_{}.png'.format(item_name))
+            # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
+            # cv2.imwrite(img_file, rgb_s)
+            print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
+            img_file = os.path.join('/workspace/DATA/YCBV/',data_type,f_idx, i_idx+'vis_nrm_angles.png')
             cv2.imwrite(img_file, rgb_nrm)
             # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
             # cv2.imwrite(img_file, rgb_s)
-            print('Please look at /workspace/DATA/Occ_Linemod/data/your_class/angles_or_signed_itemname.png')
+            print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
             exit()
-            
-            
-        if not os.path.exists(os.path.join('/workspace/DATA/Occ_LineMod','train_pbr',scene_id,'pseudo_nrm_angles')):
-            os.makedirs(os.path.join('/workspace/DATA/Occ_LineMod','train_pbr',scene_id,'pseudo_nrm_angles'))
-        rgb_file = os.path.join('/workspace/DATA/Occ_LineMod','train_pbr',scene_id,'pseudo_nrm_angles','{}'.format(item_name))
-        np.savez_compressed(rgb_file, angles=rgb_nrm)
-    print('Finish real/ testing data generation!!')
 
+        rgb_file = os.path.join('/workspace/DATA/YCBV',data_type,f_idx,i_idx+'-pseudo_nrm_angles')
+        np.savez_compressed(rgb_file, angles=rgb_nrm)
+
+    else:
+        K = ycb_K1
+        with Image.open(os.path.join('/workspace/DATA/YCBV',data_type, f_idx+"-depth.png")) as di:
+            dpt_um = np.array(di)
+
+        # meta = scio.loadmat(os.path.join('/workspace/DATA/YCBV',data_type, f_idx+'-meta.mat'))
+        # cam_scale = meta['factor_depth'].astype(np.float32)[0][0]
+        cam_scale=10000.
+        dpt_um = fill_missing(dpt_um, cam_scale, 1)
+
+        dpt_mm = (dpt_um.copy()/10).astype(np.uint16)
+        nrm_map = normalSpeed.depth_normal(dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False)
+
+        # if True:
+        #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
+        #     img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_nrm_{}.png'.format(item_name))
+        #     cv2.imwrite(img_file, show_nrm_map)
+        
+        # dpt_m = dpt_mm.astype(np.float32) / cam_scale
+        # dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
+        # dpt_xyz[np.isnan(dpt_xyz)] = 0.0
+        # dpt_xyz[np.isinf(dpt_xyz)] = 0.0
+        # rgb = pseudo_gen(args, dpt_xyz)
+        
+        rgb_nrm = pseudo_nrm_angle(nrm_map)
+        
+        if args.vis_img:
+            
+            # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_cur_{}.png'.format(item_name))
+            # cv2.imwrite(img_file, surface_curvature)
+            # # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
+            # # cv2.imwrite(img_file, rgb_s)
+            # print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
+            # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_angles_{}.png'.format(item_name))
+            # cv2.imwrite(img_file, rgb)
+            # # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
+            # # cv2.imwrite(img_file, rgb_s)
+            # print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
+            img_file = os.path.join('/workspace/DATA/YCBV',data_type,f_idx+'-vis_nrm_angles.png')
+            cv2.imwrite(img_file, rgb_nrm)
+            # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
+            # cv2.imwrite(img_file, rgb_s)
+            print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
+            exit()
+
+        rgb_file = os.path.join('/workspace/DATA/YCBV',data_type,f_idx+'-pseudo_nrm_angles')
+        np.savez_compressed(rgb_file, angles=rgb_nrm)
+    
+print('Finish training data generation!!')
+    
+    
+    
+# for item_name in tqdm.tqdm(testlist):
+
+#     f_idx = item_name.split('/')[1] 
+#     data_type = item_name.split('/')[0]
+    
+#     if data_type != 'data_syn':
+#         i_idx = item_name.split('/')[2]
+#         if int(f_idx) >= 60:
+#             K = ycb_K2
+#         else:
+#             K = ycb_K1
+            
+        
+#         with Image.open(os.path.join('/workspace/DATA/YCBV',data_type, f_idx, i_idx+"-depth.png")) as di:
+#             dpt_um = np.array(di)
+
+#         # meta = scio.loadmat(os.path.join('/workspace/DATA/YCBV',data_type, f_idx, i_idx+'-meta.mat'))
+        
+#         # cam_scale = meta['factor_depth'].astype(np.float32)[0][0]
+#         cam_scale=10000.
+#         dpt_um = fill_missing(dpt_um, cam_scale, 1)
+
+#         dpt_mm = (dpt_um.copy()/10).astype(np.uint16)
+#         nrm_map = normalSpeed.depth_normal(dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False)
+
+#         # if True:
+#         #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
+#         #     img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_nrm_{}.png'.format(item_name))
+#         #     cv2.imwrite(img_file, show_nrm_map)
+        
+#         # dpt_m = dpt_mm.astype(np.float32) / cam_scale
+#         # dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
+#         # dpt_xyz[np.isnan(dpt_xyz)] = 0.0
+#         # dpt_xyz[np.isinf(dpt_xyz)] = 0.0
+
+        
+#         # rgb = pseudo_gen(args, dpt_xyz)
+#         rgb_nrm = pseudo_nrm_angle(nrm_map)
+        
+#         if args.vis_img:
+            
+#             # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_cur_{}.png'.format(item_name))
+#             # cv2.imwrite(img_file, surface_curvature)
+#             # # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
+#             # # cv2.imwrite(img_file, rgb_s)
+#             # print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
+#             # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_angles_{}.png'.format(item_name))
+#             # cv2.imwrite(img_file, rgb)
+#             # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
+#             # cv2.imwrite(img_file, rgb_s)
+#             print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
+#             img_file = os.path.join('/workspace/DATA/YCBV/',data_type,f_idx, i_idx+'vis_nrm_angles.png')
+#             cv2.imwrite(img_file, rgb_nrm)
+#             # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
+#             # cv2.imwrite(img_file, rgb_s)
+#             print('Please look at /workspace/DATA/Linemod_preprocessed/data/your_class/angles_or_signed_itemname.png')
+#             exit()
+            
+            
+#         # if not os.path.exists(os.path.join('/workspace/DATA/YCBV','data',f_idx,i_idx+'-pseudo_nrm_angles')):
+#         #     os.makedirs(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles'))
+#         rgb_file = os.path.join('/workspace/DATA/YCBV',data_type,f_idx,i_idx+'-pseudo_nrm_angles')
+#         np.savez_compressed(rgb_file, angles=rgb_nrm)
+# print('Finish testing data generation!!') 
 
 # K=np.array([[572.4114, 0.0, 325.2611082792282], 
 #             [0.0, 573.57043, 242.04899594187737], 

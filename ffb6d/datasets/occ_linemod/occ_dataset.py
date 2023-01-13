@@ -1,4 +1,4 @@
-import PIL.Image
+#!/usr/bin/env python3
 from torchvision import transforms
 import torch
 import numpy as np
@@ -6,20 +6,49 @@ import cv2
 import os
 import random
 from torch.utils.data import Dataset
+import torch
+import os.path
+from PIL import Image
+from config.common import Config
+from config.options import BaseOptions
+import pickle as pkl
+from utils.basic_utils import Basic_Utils
+import yaml
+import scipy.io as scio
+import scipy.misc
+from glob import glob
+import normalSpeed
+from models.RandLA.helper_tool import DataProcessing as DP
+try:
+    from neupeak.utils.webcv2 import imshow, waitKey
+except ImportError:
+    from cv2 import imshow, waitKey
+import math
 import pdb
 
-cuda = torch.cuda.is_available()
+# for get depth_filling function
+config_fill = Config(ds_name='ycb')
+bs_utils_fill = Basic_Utils(config_fill)
+# cuda = torch.cuda.is_available()
 
 class OcclusionLinemodDataset(Dataset):
     def __init__(self,
                  base_dir='/workspace/DATA/OCCLUSION_LINEMOD',
-                 object_name='all'):
+                 object_name='all',
+                 dataset_name='test', DEBUG=False):
+        self.opt = BaseOptions().parse()
+        self.config = Config(ds_name='occlusion_linemod', cls_type=self.opt.occ_linemod_cls)
+        self.cls_type = self.opt.occ_linemod_cls
+        self.bs_utils = Basic_Utils(self.config)
         self.camera_intrinsic = {'fu': 572.41140, 'fv': 573.57043,
                                  'uc': 325.26110, 'vc': 242.04899}
         self.K = np.matrix([[self.camera_intrinsic['fu'], 0, self.camera_intrinsic['uc']],
                             [0, self.camera_intrinsic['fv'], self.camera_intrinsic['vc']],
                             [0, 0, 1]], dtype=np.float32)
         self.img_shape = (480, 640) # (h, w)
+        self.xmap = np.array([[j for i in range(self.opt.width)] for j in range(self.opt.height)])
+        self.ymap = np.array([[i for i in range(self.opt.width)] for j in range(self.opt.height)])
+
         # use alignment_flipping to correct pose labels
         self.alignment_flipping = np.matrix([[1., 0., 0.],
                                              [0., -1., 0.],
@@ -38,7 +67,7 @@ class OcclusionLinemodDataset(Dataset):
         self.total_length = 0
         for object_name in self.object_names:
             length = len(list(filter(lambda x: x.endswith('txt'),
-                                     os.listdir(os.path.join(base_dir, 'poses', object_name)))))
+                                     os.listdir(os.path.join(base_dir, 'valid_poses', object_name)))))
             self.lengths[object_name] = length
             self.total_length += length
         # pre-load data into memory
@@ -46,19 +75,27 @@ class OcclusionLinemodDataset(Dataset):
         self.normals = {}
         self.R_lo = {}
         self.t_lo = {}
+    
         for object_name in self.object_names:
             # transformations
             self.R_lo[object_name], self.t_lo[object_name] = \
                     self.get_linemod_to_occlusion_transformation(object_name)
             # keypoints
-            pts3d_name = os.path.join('data/linemod', 'keypoints',
-                                      object_name, 'keypoints_3d.npy')
-            pts3d = np.float32(np.load(pts3d_name))
-            self.pts3d[object_name] = pts3d
+            # if self.opt.n_keypoints == 8:
+            #     kp_type = 'farthest'
+            # else:
+            #     kp_type = 'farthest{}'.format(self.opt.n_keypoints)
+            # pts3d = self.bs_utils.get_kps(
+            #     self.cls_type, kp_type=kp_type, ds_type='linemod'
+            # )
+            # # pts3d_name = os.path.join('data/linemod', 'keypoints',
+            # #                           object_name, 'keypoints_3d.npy')
+            # # pts3d = np.float32(np.load(pts3d_name))
+            # self.pts3d[object_name] = pts3d
             # symmetry plane normals
-            normal_name = os.path.join('data/linemod', 'symmetries',
-                                       object_name, 'symmetries.txt')
-            self.normals[object_name] = self.read_normal(normal_name)
+            # normal_name = os.path.join('data/linemod', 'symmetries',
+            #                            object_name, 'symmetries.txt')
+            # self.normals[object_name] = self.read_normal(normal_name)
         self.img_transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize(mean=[0.485, 0.456, 0.406],
@@ -70,6 +107,7 @@ class OcclusionLinemodDataset(Dataset):
 
     def get_linemod_to_occlusion_transformation(self, object_name):
         # https://github.com/ClayFlannigan/icp
+        
         if object_name == 'ape':
             R = np.array([[-4.5991463e-08, -1.0000000e+00,  1.1828890e-08],
                           [ 8.5046146e-08, -4.4907327e-09, -1.0000000e+00],
@@ -131,6 +169,7 @@ class OcclusionLinemodDataset(Dataset):
                     read_rotation = True
                 elif line.startswith('center'):
                     read_translation = True
+        
         R = np.array(R, dtype=np.float32) # 3*3
         T = np.array(T, dtype=np.float32).reshape((3, 1)) # 3*1
         img_id = int(line) # in the last line
@@ -206,7 +245,6 @@ class OcclusionLinemodDataset(Dataset):
         return np.matrix(vertices)
 
     def read_3d_points_occlusion(self, object_name):
-        import glob
         filename = glob.glob('data/occlusion_linemod/models/{}/*.xyz'.format(object_name))[0]
         with open(filename) as f:
             vertices = []
@@ -218,60 +256,276 @@ class OcclusionLinemodDataset(Dataset):
                 vertices.append(vertex)
         vertices = np.matrix(vertices)
         return vertices
+    
+    
+            
+    def get_pose_gt_info(self, cld, labels, RT):
+        RTs = np.zeros((self.config.n_objects, 3, 4))
+        kp3ds = np.zeros((self.config.n_objects, self.opt.n_keypoints, 3))
+        ctr3ds = np.zeros((self.config.n_objects, 3))
+        cls_ids = np.zeros((self.config.n_objects, 1))
+        kp_targ_ofst = np.zeros((self.opt.n_sample_points, self.opt.n_keypoints, 3))
+        ctr_targ_ofst = np.zeros((self.opt.n_sample_points, 3))
+        for i, cls_id in enumerate([1]):
+            RTs[i] = RT
+            r = RT[:, :3]
+            t = RT[:, 3]
 
+            ctr = self.bs_utils.get_ctr(self.cls_type, ds_type="linemod")[:, None]
+            ctr = np.dot(ctr.T, r.T) + t
+            ctr3ds[i, :] = ctr[0]
+            msk_idx = np.where(labels == cls_id)[0]
+
+            target_offset = np.array(np.add(cld, -1.0*ctr3ds[i, :]))
+            ctr_targ_ofst[msk_idx, :] = target_offset[msk_idx, :]
+            cls_ids[i, :] = np.array([1])
+
+            if self.opt.n_keypoints == 8:
+                kp_type = 'farthest'
+            else:
+                kp_type = 'farthest{}'.format(self.opt.n_keypoints)
+            kps = self.bs_utils.get_kps(
+                self.cls_type, kp_type=kp_type, ds_type='linemod'
+            )
+            # pts3d_name = os.path.join('data/linemod', 'keypoints',
+            #                           object_name, 'keypoints_3d.npy')
+            # pts3d = np.float32(np.load(pts3d_name))
+            
+            kps = np.dot(kps, r.T) + t
+            kp3ds[i] = kps
+            ############################
+            # pts3d = self.pts3d[object_name]
+            # pts3d_trans = np.matrix(R) * np.matrix(pts3d).transpose() + np.matrix(t)
+            # pts3d_trans = np.array(pts3d_trans)
+            ##########################
+            target = []
+            for kp in kps:
+                target.append(np.add(cld, -1.0*kp))
+            target_offset = np.array(target).transpose(1, 0, 2)  # [npts, nkps, c]
+            kp_targ_ofst[msk_idx, :, :] = target_offset[msk_idx, :, :]
+
+        return RTs, kp3ds, ctr3ds, cls_ids, kp_targ_ofst, ctr_targ_ofst
+    def scale_pseudo(self, pseudo):
+        
+        # Scale the pseudo angles and signed angles to image range (0 ~ 255) 
+        pseudo[:,:,0][pseudo[:,:,0]==360] = 255
+        pseudo[:,:,0][pseudo[:,:,0]<255] = (pseudo[:,:,0][pseudo[:,:,0]<255]-pseudo[:,:,0][pseudo[:,:,0]<255].min())*(254/(pseudo[:,:,0][pseudo[:,:,0]<255].max()-pseudo[:,:,0][pseudo[:,:,0]<255].min()))
+        pseudo[:,:,1][pseudo[:,:,1]==360] = 255
+        pseudo[:,:,1][pseudo[:,:,1]<255] = (pseudo[:,:,1][pseudo[:,:,1]<255]-pseudo[:,:,1][pseudo[:,:,1]<255].min())*(254/(pseudo[:,:,1][pseudo[:,:,1]<255].max()-pseudo[:,:,1][pseudo[:,:,1]<255].min()))
+        pseudo[:,:,2][pseudo[:,:,2]==360] = 255
+        pseudo[:,:,2][pseudo[:,:,2]<255] = (pseudo[:,:,2][pseudo[:,:,2]<255]-pseudo[:,:,2][pseudo[:,:,2]<255].min())*(254/(pseudo[:,:,2][pseudo[:,:,2]<255].max()-pseudo[:,:,2][pseudo[:,:,2]<255].min()))
+        
+        # pseudo[:,:,0][pseudo[:,:,0]==360] = 255
+        # pseudo[:,:,0][pseudo[:,:,0]<255] = pseudo[:,:,0][pseudo[:,:,0]<255]*254.0/180.0
+        # pseudo[:,:,1][pseudo[:,:,1]==360] = 255
+        # pseudo[:,:,1][pseudo[:,:,1]<255] = pseudo[:,:,1][pseudo[:,:,1]<255]*254.0/180.0
+        # pseudo[:,:,2][pseudo[:,:,2]==360] = 255
+        # pseudo[:,:,2][pseudo[:,:,2]<255] = pseudo[:,:,2][pseudo[:,:,2]<255]*254.0/180.0
+        
+        return pseudo
+    
+    
+    
+    def dpt_2_pcld(self, dpt, cam_scale, K):
+        if len(dpt.shape) > 2:
+            dpt = dpt[:, :, 0]
+        dpt = dpt.astype(np.float32) / cam_scale
+        msk = (dpt > 1e-8).astype(np.float32)
+        row = (self.ymap - K[0,2]) * dpt / K[0,0]
+        col = (self.xmap - K[1,2]) * dpt / K[1,1]
+        dpt_3d = np.concatenate(
+            (row[..., None], col[..., None], dpt[..., None]), axis=2
+        )
+        dpt_3d = dpt_3d * msk[:, :, None]
+        return dpt_3d
+    
     def __getitem__(self, idx):
+        
         local_idx = idx
         for object_name in self.object_names:
             if local_idx < self.lengths[object_name]:
                 # pose
-                pose_name = os.path.join(self.base_dir, 'poses', object_name, '{}.txt'.format(local_idx))
+                pose_name = os.path.join(self.base_dir, 'valid_poses', object_name, '{}.txt'.format(local_idx))
                 R, t, img_id = self.read_pose_and_img_id(pose_name, local_idx)
                 R = np.array(self.alignment_flipping * R, dtype=np.float32)
                 t = np.array(self.alignment_flipping * t, dtype=np.float32)
                 # apply linemod->occlusion alignment
                 t = np.matmul(R, self.t_lo[object_name]) + t
                 R = np.matmul(R, self.R_lo[object_name])
+                RT = np.concatenate((R, t), axis=1)
                 # image
-                image_name = os.path.join(self.base_dir, 'RGB-D', 'rgb_noseg', 'color_{:05d}.png'.format(img_id))
-                image = self.img_transform(PIL.Image.open(image_name).convert('RGB'))
-                # keypoints
-                pts3d = self.pts3d[object_name]
-                pts2d = self.K * (np.matrix(R) * np.matrix(pts3d).transpose() + np.matrix(t))
-                pts2d = np.array(pts2d)
-                pts2d[0] /= pts2d[2]
-                pts2d[1] /= pts2d[2]
-                pts2d = pts2d[[0, 1]].transpose()
-                # symmetry correspondences (this is invalid. do not use)
-                sym_cor_name = os.path.join(self.base_dir, 'my_labels', object_name, 'cor', '{}.npy'.format(local_idx))
-                sym_cor = np.float32(np.load(sym_cor_name)).transpose([2, 0, 1])
-                normal = self.normals[object_name]
+                with np.load(os.path.join(self.base_dir, 'data', object_name, "pseudo_nrm_angles/{:04d}.npz".format(img_id))) as data:
+                    angles = data['angles']
+                # convert angles and signed angles to image range (0~255)
+                pdb.set_trace()
+                sed_angles = self.scale_pseudo(angles)
+                sed_angles = Image.fromarray(np.uint8(sed_angles))
+                nrm_angles = np.array(sed_angles)[:, :, :3]
                 # mask
-                mask_name = os.path.join(self.base_dir, 'masks', object_name, '{}.png'.format(img_id))
-                mask = cv2.imread(mask_name, cv2.IMREAD_GRAYSCALE)
-                mask = np.float32(mask).reshape((1, mask.shape[0], mask.shape[1]))
-                mask[mask != 0.] = 1.
-                # keypoint map
-                pts2d_map = self.keypoints_to_map(mask, pts2d)
-                # graph
-                graph = self.keypoints_to_graph(mask, pts2d)
-                return {
-                        'object_name': object_name,
-                        'local_idx': local_idx,
-                        'image_name': image_name,
-                        'image': image,
-                        'pts2d': pts2d,
-                        'pts2d_map': pts2d_map,
-                        'pts3d': pts3d,
-                        'R': R,
-                        't': t,
-                        'sym_cor': sym_cor,
-                        'normal': normal,
-                        'mask': mask,
-                        'graph': graph
-                        }
-            else:
-                local_idx -= self.lengths[object_name]
-        raise ValueError('Invalid index: {}'.format(idx))
+                with Image.open(os.path.join(self.base_dir, 'masks', object_name, '{}.png'.format(img_id))) as li:
+                    labels = np.array(li)
+                    labels = (labels > 0).astype("uint8")
+                # depth
+                with Image.open(os.path.join(self.base_dir, 'RGB-D', 'depth_noseg', 'depth_{:05d}.png'.format(img_id))) as di:
+                    dpt_mm = np.array(di)
+                cam_scale = 1000.0
+                dpt_mm = bs_utils_fill.fill_missing(dpt_mm, cam_scale, 1)
+                dpt_mm = dpt_mm.copy().astype(np.uint16)
+                nrm_map = normalSpeed.depth_normal(
+                    dpt_mm, self.K[0,0], self.K[1,1], 5, 2000, 20, False
+                )
+                # if self.DEBUG:
+                #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
+                #     imshow("nrm_map", show_nrm_map)
+
+                dpt_m = dpt_mm.astype(np.float32) / cam_scale
+                dpt_xyz = self.dpt_2_pcld(dpt_m, 1.0, self.K)
+                dpt_xyz[np.isnan(dpt_xyz)] = 0.0
+                dpt_xyz[np.isinf(dpt_xyz)] = 0.0
+                if len(labels.shape) > 2:
+                    labels = labels[:, :, 0]
+                rgb_labels = labels.copy()
+                
+                msk_dp = dpt_mm > 1e-6
+                choose = msk_dp.flatten().nonzero()[0].astype(np.uint32)
+                if len(choose) < 400:
+                    return None
+                choose_2 = np.array([i for i in range(len(choose))])
+                if len(choose_2) < 400:
+                    return None
+                if len(choose_2) > self.opt.n_sample_points:
+                    c_mask = np.zeros(len(choose_2), dtype=int)
+                    c_mask[:self.opt.n_sample_points] = 1
+                    np.random.shuffle(c_mask)
+                    choose_2 = choose_2[c_mask.nonzero()]
+                else:
+                    choose_2 = np.pad(choose_2, (0, self.opt.n_sample_points-len(choose_2)), 'wrap')
+                choose = np.array(choose)[choose_2]
+
+                sf_idx = np.arange(choose.shape[0])
+                np.random.shuffle(sf_idx)
+                choose = choose[sf_idx]
+
+                cld = dpt_xyz.reshape(-1, 3)[choose, :]
+                nrm_angles_pt = nrm_angles.reshape(-1, 3)[choose, :].astype(np.float32)
+                nrm_pt = nrm_map[:, :, :3].reshape(-1, 3)[choose, :]
+                labels_pt = labels.flatten()[choose]
+                choose = np.array([choose])
+                cld_angle_nrm = np.concatenate((cld, nrm_angles_pt, nrm_pt), axis=1).transpose(1, 0)        
+                
+                # keypoints
+                RTs, kp3ds, ctr3ds, cls_ids, kp_targ_ofst, ctr_targ_ofst = self.get_pose_gt_info(cld, labels_pt, RT)
+                
+                h, w = self.opt.height, self.opt.width
+
+                nrm_angles = np.transpose(nrm_angles, (2, 0, 1)) # hwc2chw
+
+                xyz_lst = [dpt_xyz.transpose(2, 0, 1)]  # c, h, w
+                msk_lst = [dpt_xyz[2, :, :] > 1e-8]
+                
+                for i in range(3):
+                    scale = pow(2, i+1)
+
+                    nh, nw = h // pow(2, i+3), w // pow(2, i+3)
+                    ys, xs = np.mgrid[:nh, :nw]
+                    xyz_lst.append(xyz_lst[0][:, ys*scale, xs*scale])
+                    msk_lst.append(xyz_lst[-1][2, :, :] > 1e-8)
+                
+                sr2dptxyz = {
+                    pow(2, ii): item.reshape(3, -1).transpose(1, 0)
+                    for ii, item in enumerate(xyz_lst)
+                }
+
+                rgb_ds_sr = [4, 8, 8, 8]
+                n_ds_layers = 4
+                pcld_sub_s_r = [4, 4, 4, 4]
+                inputs = {}
+                # DownSample stage
+                for i in range(n_ds_layers):
+                    
+                    nei_idx = DP.knn_search(
+                        cld[None, ...], cld[None, ...], 16
+                    ).astype(np.int32).squeeze(0)
+                    sub_pts = cld[:cld.shape[0] // pcld_sub_s_r[i], :]
+                    pool_i = nei_idx[:cld.shape[0] // pcld_sub_s_r[i], :]
+                    up_i = DP.knn_search(
+                        sub_pts[None, ...], cld[None, ...], 1
+                    ).astype(np.int32).squeeze(0)
+                    inputs['cld_xyz%d' % i] = cld.astype(np.float32).copy()
+                    inputs['cld_nei_idx%d' % i] = nei_idx.astype(np.int32).copy()
+                    
+                    inputs['cld_sub_idx%d' % i] = pool_i.astype(np.int32).copy()
+                    inputs['cld_interp_idx%d' % i] = up_i.astype(np.int32).copy()
+                    # nei_r2p = DP.knn_search(
+                    #     sr2dptxyz[rgb_ds_sr[i]][None, ...], sub_pts[None, ...], 16
+                    # ).astype(np.int32).squeeze(0)
+                    #inputs['r2p_ds_nei_idx%d' % i] = nei_r2p.copy()
+                    
+                    # nei_p2r = DP.knn_search(
+                    #     sub_pts[None, ...], sr2dptxyz[rgb_ds_sr[i]][None, ...], 1
+                    # ).astype(np.int32).squeeze(0)
+                    #inputs['p2r_ds_nei_idx%d' % i] = nei_p2r.copy()
+                    cld = sub_pts
+
+                n_up_layers = 3
+                rgb_up_sr = [4, 2, 2]
+                for i in range(n_up_layers):
+                    r2p_nei = DP.knn_search(
+                        sr2dptxyz[rgb_up_sr[i]][None, ...],
+                        inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...], 16
+                    ).astype(np.int32).squeeze(0)
+                    #inputs['r2p_up_nei_idx%d' % i] = r2p_nei.copy()
+                    p2r_nei = DP.knn_search(
+                        inputs['cld_xyz%d'%(n_ds_layers-i-1)][None, ...],
+                        sr2dptxyz[rgb_up_sr[i]][None, ...], 1
+                    ).astype(np.int32).squeeze(0)
+                    #inputs['p2r_up_nei_idx%d' % i] = p2r_nei.copy()
+
+                # show_rgb = rgb.transpose(1, 2, 0).copy()[:, :, ::-1]
+                # if self.DEBUG:
+                #     for ip, xyz in enumerate(xyz_lst):
+                #         pcld = xyz.reshape(3, -1).transpose(1, 0)
+                #         p2ds = self.bs_utils.project_p3d(pcld, cam_scale, K)
+                #         srgb = self.bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
+                        # imshow("rz_pcld_%d" % ip, srgb)
+                        # p2ds = self.bs_utils.project_p3d(inputs['cld_xyz%d'%ip], cam_scale, K)
+                        # srgb1 = self.bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
+                        # imshow("rz_pcld_%d_rnd" % ip, srgb1)
+                # print(
+                #     "kp3ds:", kp3ds.shape, kp3ds, "\n",
+                #     "kp3ds.mean:", np.mean(kp3ds, axis=0), "\n",
+                #     "ctr3ds:", ctr3ds.shape, ctr3ds, "\n",
+                #     "cls_ids:", cls_ids, "\n",
+                #     "labels.unique:", np.unique(labels),
+                # )
+                # if ".npz" in item_name:
+                #     item_name = item_name.split('/')[-1].split('.')[0]
+                item_dict = dict(
+                    img_id=np.uint8(img_id),
+                    nrm_angles=nrm_angles.astype(np.uint8),  # [c, h, w]
+                    cld_angle_nrm=cld_angle_nrm.astype(np.float32),  # [9, npts]
+                    choose=choose.astype(np.int32),  # [1, npts]
+                    labels=labels_pt.astype(np.int32),  # [npts]
+                    rgb_labels=rgb_labels.astype(np.int32),  # [h, w]
+                    dpt_map_m=dpt_m.astype(np.float32),  # [h, w]
+                    RTs=RTs.astype(np.float32),
+                    kp_targ_ofst=kp_targ_ofst.astype(np.float32),
+                    ctr_targ_ofst=ctr_targ_ofst.astype(np.float32),
+                    cls_ids=cls_ids.astype(np.int32),
+                    ctr_3ds=ctr3ds.astype(np.float32),
+                    kp_3ds=kp3ds.astype(np.float32),
+                )
+                item_dict.update(inputs)
+        # if self.DEBUG:
+        #     extra_d = dict(
+        #         dpt_xyz_nrm=dpt_6c.astype(np.float32),  # [6, h, w]
+        #         cam_scale=np.array([cam_scale]).astype(np.float32),
+        #         K=K.astype(np.float32),
+        #     )
+        #     item_dict.update(extra_d)
+        #     item_dict['normal_map'] = nrm_map[:, :, :3].astype(np.float32)
+        return item_dict
+
 
 if __name__ == '__main__':
     linemod_objects = ['ape', 'can', 'cat', 'driller',

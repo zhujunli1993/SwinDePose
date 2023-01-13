@@ -21,7 +21,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_sched
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import CyclicLR
+from torch.optim.lr_scheduler import PolynomialLR, CyclicLR
 from utils import scheduler
 import torch.backends.cudnn as cudnn
 # from ignite.handlers import param_scheduler as ps
@@ -31,11 +31,11 @@ from config.options import BaseOptions
 from config.common import Config, ConfigRandLA
 
 import models.pytorch_utils as pt_utils
-from models.ffb6d_nrmOnly_swinTiny_dense import FFB6D
+from models.ffb6d_dep_swinTiny_dense import FFB6D
 from models.loss import OFLoss, FocalLoss
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
-import datasets.occ_linemod.occ_dataset_nrmOnly_swin as dataset_desc
+import datasets.linemod.linemod_dataset_onlyDepth as dataset_desc
 
 
 from apex.parallel import DistributedDataParallel
@@ -47,7 +47,7 @@ from apex import amp
 # get options
 opt = BaseOptions().parse()
 
-config = Config(ds_name=opt.dataset_name, cls_type=opt.occ_linemod_cls)
+config = Config(ds_name=opt.dataset_name, cls_type=opt.linemod_cls)
 bs_utils = Basic_Utils(config)
 
 # create log folders 
@@ -178,7 +178,7 @@ def model_fn_decorator(
     ):
         
         if finish_test:
-            teval.cal_lmo_add(config.cls_id)
+            teval.cal_lm_add(config.cls_id)
             return None
         if is_eval:
             model.eval()
@@ -260,16 +260,16 @@ def model_fn_decorator(
                             "training loss": loss_dict,
                             "train_acc": acc_dict})
             if is_test and test_pose:
-                cld = cu_dt['cld_angle_nrm'][:, :3, :].permute(0, 2, 1).contiguous()
-                img_id=0
+                cld = cu_dt['cld_rgb_nrm'][:, :3, :].permute(0, 2, 1).contiguous()
+                
                 if not opt.test_gt:
                     # eval pose from point cloud prediction.
                     add, adds, pred_kp, gt_kp, gt_ctr = teval.eval_pose_parallel(
-                        cld, img_id,cu_dt['nrm_angles'], cls_rgbd, end_points['pred_ctr_ofs'],
+                        cld, cu_dt['img_id'], cu_dt['rgb'], cls_rgbd, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],
                         cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
-                        ds='occlusion_linemod', obj_id=config.cls_id,
+                        ds='linemod', obj_id=config.cls_id,
                         min_cnt=1, use_ctr_clus_flter=True, use_ctr=True,
                     )
                 # else:
@@ -291,21 +291,22 @@ def model_fn_decorator(
                     gt_ctr_ofs = cu_dt['ctr_targ_ofst'].unsqueeze(2).permute(0, 2, 1, 3)
                     gt_kp_ofs = cu_dt['kp_targ_ofst'].permute(0, 2, 1, 3)
                     add, adds, pred_kp, gt_kp, gt_ctr = teval.eval_pose_parallel(
-                        cld, img_id, cu_dt['nrm_angles'], labels, end_points['pred_ctr_ofs'],
+                        cld, cu_dt['img_id'], cu_dt['rgb'], labels, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],
                         cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
-                        ds='occlusion_linemod', obj_id=config.cls_id,
+                        ds='linemod', obj_id=config.cls_id,
                         min_cnt=1, use_ctr_clus_flter=True, use_ctr=True
                     )
             if opt.eval_net:
                 test_res = {
+                'img_id':cu_dt['img_id'].item(),
                 'add': add,
                 'adds':adds,
                 'pred_kp':pred_kp,
                 'gt_kp':gt_kp,
                 'gt_ctr':gt_ctr,
-                'cld':cu_dt['cld_angle_nrm'][:,0:3,:].cpu().numpy()
+                'cld':cu_dt['cld_rgb_nrm'][:,0:3,:].cpu().numpy()
             }
         if opt.eval_net:    
             return (
@@ -372,6 +373,7 @@ class Trainer(object):
         #         'loss_all': loss.item(),
         #         'loss_target': loss.item()
         if opt.eval_net:
+            img_ids = []
             loss_all = []
             loss_kp = []
             loss_seg = []
@@ -399,6 +401,7 @@ class Trainer(object):
                 self.model, data, is_eval=True, is_test=is_test, test_pose=test_pose
             )
             if opt.eval_net:
+                img_ids.append(test_res['img_id'])
                 loss_all.append(eval_res['loss_all'])
                 loss_kp.append(eval_res['loss_kp_of'])
                 loss_seg.append(eval_res['loss_rgbd_seg'])
@@ -419,6 +422,7 @@ class Trainer(object):
         
         if opt.eval_net:
             test_results={
+            'img_ids':img_ids,
             'loss_all':loss_all,
             'loss_kp':loss_kp,
             'loss_seg':loss_seg,
@@ -607,20 +611,20 @@ def train():
         #     val_ds, batch_size=opt.val_mini_batch_size, shuffle=False,
         #     drop_last=False, num_workers=opt.num_threads, sampler=val_sampler
         # )
-        train_ds = dataset_desc.Dataset('train', cls_type=opt.occ_linemod_cls)
-        train_loader = DataLoader(
+        train_ds = dataset_desc.Dataset('train', cls_type=opt.linemod_cls)
+        train_loader = torch.utils.data.DataLoader(
             train_ds, batch_size=opt.mini_batch_size, shuffle=True,
             drop_last=True, num_workers=opt.num_threads, pin_memory=opt.pin_memory
         )
 
-        val_ds = dataset_desc.Dataset('test', cls_type=opt.occ_linemod_cls)
-        val_loader = DataLoader(
+        val_ds = dataset_desc.Dataset('test', cls_type=opt.linemod_cls)
+        val_loader = torch.utils.data.DataLoader(
             val_ds, batch_size=opt.val_mini_batch_size, shuffle=True,
             drop_last=False, num_workers=opt.num_threads
         )
     else:
-        test_ds = dataset_desc.Dataset('test', cls_type=opt.occ_linemod_cls)
-        test_loader = DataLoader(
+        test_ds = dataset_desc.Dataset('test', cls_type=opt.linemod_cls)
+        test_loader = torch.utils.data.DataLoader(
             test_ds, batch_size=opt.test_mini_batch_size, shuffle=False,
             num_workers=opt.num_threads
         )
@@ -669,12 +673,12 @@ def train():
         )
         
         
-        clr_div = opt.clr_div #clr_div=6
+        clr_div = 6 #clr_div=6
         lr_scale = int(opt.n_total_epoch * train_ds.minibatch_per_epoch // clr_div // opt.gpus )
         # lr_scale = opt.n_total_epoch * 10 // opt.gpus
         # train_ds.minibatch_per_epoch= all_training_images//minibatch, clr_div=2, scale=60/2
         lr_scheduler = CyclicLR(
-            optimizer, base_lr=opt.cyc_base_lr, max_lr=opt.cyc_max_lr,
+            optimizer, base_lr=1e-5, max_lr=1e-3,
             cycle_momentum=False,
             step_size_up=lr_scale,
             step_size_down=lr_scale,
@@ -714,7 +718,7 @@ def train():
         model,
         model_fn,
         optimizer,
-        checkpoint_name=os.path.join(checkpoint_fd, "FFB6D_%s" % opt.occ_linemod_cls),
+        checkpoint_name=os.path.join(checkpoint_fd, "FFB6D_%s" % opt.linemod_cls),
         lr_scheduler=lr_scheduler,
         bnm_scheduler=bnm_scheduler,
     )

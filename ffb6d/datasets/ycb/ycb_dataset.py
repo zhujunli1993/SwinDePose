@@ -6,17 +6,21 @@ import os.path
 import numpy as np
 import torchvision.transforms as transforms
 from PIL import Image
-from common import Config
+from config.common import Config
+from config.options import BaseOptions
 import pickle as pkl
 from utils.basic_utils import Basic_Utils
+import yaml
 import scipy.io as scio
 import scipy.misc
-try:
-    from neupeak.utils.webcv2 import imshow, waitKey
-except:
-    from cv2 import imshow, waitKey
+from glob import glob
 import normalSpeed
 from models.RandLA.helper_tool import DataProcessing as DP
+try:
+    from neupeak.utils.webcv2 import imshow, waitKey
+except ImportError:
+    from cv2 import imshow, waitKey
+import math
 
 
 config = Config(ds_name='ycb')
@@ -26,8 +30,10 @@ bs_utils = Basic_Utils(config)
 class Dataset():
 
     def __init__(self, dataset_name, DEBUG=False):
+
         self.dataset_name = dataset_name
         self.debug = DEBUG
+        self.opt = BaseOptions().parse()
         self.xmap = np.array([[j for i in range(640)] for j in range(480)])
         self.ymap = np.array([[i for i in range(640)] for j in range(480)])
         self.diameters = {}
@@ -40,9 +46,9 @@ class Dataset():
         self.rng = np.random
         if dataset_name == 'train':
             self.add_noise = True
-            self.path = 'datasets/ycb/dataset_config/train_data.txt'
+            self.path = os.path.join(self.opt.data_root,'dataset_config/','train_data_list.txt')
             self.all_lst = bs_utils.read_lines(self.path)
-            self.minibatch_per_epoch = len(self.all_lst) // config.mini_batch_size
+            self.minibatch_per_epoch = len(self.all_lst) // self.opt.mini_batch_size
             self.real_lst = []
             self.syn_lst = []
             for item in self.all_lst:
@@ -53,7 +59,7 @@ class Dataset():
         else:
             self.pp_data = None
             self.add_noise = False
-            self.path = 'datasets/ycb/dataset_config/test_data.txt'
+            self.path = os.path.join(self.opt.data_root,'dataset_config/','test_data_list.txt')
             self.all_lst = bs_utils.read_lines(self.path)
         print("{}_dataset_size: ".format(dataset_name), len(self.all_lst))
         self.root = config.ycb_root
@@ -150,7 +156,7 @@ class Dataset():
             bk_label = np.array(li)
         bk_label = (bk_label <= 0).astype(rgb.dtype)
         bk_label_3c = np.repeat(bk_label[:, :, None], 3, 2)
-        with Image.open(os.path.join(self.root, real_item+'-pseudo.png')) as ri:
+        with Image.open(os.path.join(self.root, real_item+'-color.png')) as ri:
             back = np.array(ri)[:, :, :3] * bk_label_3c
         dpt_back = real_dpt.astype(np.float32) * bk_label.astype(np.float32)
 
@@ -176,6 +182,7 @@ class Dataset():
         return dpt_3d
 
     def get_item(self, item_name):
+        import pdb;pdb.set_trace()
         with Image.open(os.path.join(self.root, item_name+'-depth.png')) as di:
             dpt_um = np.array(di)
         with Image.open(os.path.join(self.root, item_name+'-label.png')) as li:
@@ -187,7 +194,7 @@ class Dataset():
         else:
             K = config.intrinsic_matrix['ycb_K1']
 
-        with Image.open(os.path.join(self.root, item_name+'-pseudo.png')) as ri:
+        with Image.open(os.path.join(self.root, item_name+'-color.png')) as ri:
             if self.add_noise:
                 ri = self.trancolor(ri)
             rgb = np.array(ri)[:, :, :3]
@@ -319,7 +326,7 @@ class Dataset():
                 p2ds = bs_utils.project_p3d(inputs['cld_xyz%d'%ip], cam_scale, K)
                 srgb1 = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
                 imshow("rz_pcld_%d_rnd" % ip, srgb1)
-        
+
         item_dict = dict(
             rgb=rgb.astype(np.uint8),  # [c, h, w]
             cld_rgb_nrm=cld_rgb_nrm.astype(np.float32),  # [9, npts]
