@@ -9,9 +9,9 @@ import normalSpeed
 import json
 from argparse import ArgumentParser
 import matplotlib.pyplot as plt
-
+import time
 import depth_map_utils_ycb as depth_map_utils
-
+import torch
 # def curv(points):
 #     neighborhood_size=50
 #     points = torch.from_numpy(points).float()
@@ -74,56 +74,99 @@ def dpt_2_pcld(dpt, cam_scale, K):
     return dpt_3d
 
 def pseudo_nrm_angle(nrm_map):
+    device = torch.device('cuda:0')
+    nrm_map=torch.from_numpy(nrm_map).to(device)   # 480, 640, 3
+
+    start_time = time.time()
     height=480
     width=640
     # Set up-axis 
-    x_up = np.array([1.0, 0.0, 0.0])
-    y_up = np.array([0.0, 1.0, 0.0])
-    z_up = np.array([0.0, 0.0, 1.0])
+    '''x_up = torch.tensor([1.0, 0.0, 0.0]).to(device)
+    y_up = torch.tensor([0.0, 1.0, 0.0]).to(device)
+    z_up = torch.tensor([0.0, 0.0, 1.0]).to(device)'''
 
-    angle_x = []
-    # signed_x = []
-    angle_y = []
-    # signed_y = []
-    angle_z = []
-    # signed_z = []
-    # dpt_xyz = np.reshape(dpt_xyz,(height, width, 3))
-    for i in range(0, height):
+    '''angle_x = torch.zeros([height, width]).to(device)
+    angle_y = torch.zeros([height, width]).to(device)
+    angle_z = torch.zeros([height, width]).to(device)'''
+    
+    up_axis = torch.tensor([[1.0, 0.0, 0.0],
+                            [0.0, 1.0, 0.0],
+                            [0.0, 0.0, 1.0]]).to(device)    # 3, 3
+
+    values = torch.matmul(nrm_map, up_axis)
+    
+    # Replace (0, 0, 0) in values to (1, 1, 1)  (360, 360, 360)
+    values_zeros = torch.zeros(nrm_map.size()[0], nrm_map.size()[1]).to(device)
+    values_ones = torch.ones(nrm_map.size()[0], nrm_map.size()[1]).to(device)
+    
+    new_tensor = torch.where(torch.sum(nrm_map, axis=-1) == 0, values_ones, values_zeros)
+    new_tensor = new_tensor.unsqueeze(-1).repeat(1, 1, 3)
+
+    values = values + new_tensor
+    
+    # Set threshold
+    epsilon = torch.tensor(1E-6).to(device)
+    values_ones = torch.ones_like(values).to(device)
+    values = torch.where(values > (1.0 - epsilon), values_ones, values)
+    values = torch.where(values < (epsilon - 1.0), -values_ones, values)
+    
+    # Compute angles
+    angles = torch.arccos(values)*180.0/math.pi
+    angles_fill = torch.ones(nrm_map.size()[0], nrm_map.size()[1]).to(device) * 360
+    angles_fill = torch.where(torch.sum(nrm_map, axis=-1) == 0, angles_fill, values_zeros)
+    angles_fill = angles_fill.unsqueeze(-1).repeat(1, 1, 3)
+    angles = angles + angles_fill
+    
+    angle_x = angles[:, :, 0]
+    angle_y = angles[:, :, 1]
+    angle_z = angles[:, :, 2]
+    
+    
+    
+    '''for i in range(0, height):
         for j in range(0, width):
             if sum(nrm_map[i, j])==0.0:
-                angle_x.append(360.0)
-                angle_y.append(360.0)
-                angle_z.append(360.0)
+                angle_x[i,j]=torch.tensor(360.0).to(device)
+                angle_y[i,j]=torch.tensor(360.0).to(device)
+                angle_z[i,j]=torch.tensor(360.0).to(device)
                 continue
             else:
                 nrm_c = nrm_map[i, j]
-                epsilon = 1E-6
+                epsilon = torch.tensor(1E-6).to(device)
+                
                 value_x = nrm_c[0]*x_up[0] + nrm_c[1]*x_up[1] + nrm_c[2]*x_up[2]
                 value_y = nrm_c[0]*y_up[0] + nrm_c[1]*y_up[1] + nrm_c[2]*y_up[2]
                 value_z = nrm_c[0]*z_up[0] + nrm_c[1]*z_up[1] + nrm_c[2]*z_up[2]
+                
+                
                 if value_x > (1.0 - epsilon):
-                    value_x = 1.0
+                    value_x = torch.tensor(1.0)
                 elif value_x < (epsilon - 1.0):
-                    value_x = -1.0 
-                angle_x.append(np.arccos(value_x)*180.0/math.pi)
+                    value_x = torch.tensor(-1.0)
+                angle_x[i,j]=torch.arccos(value_x)*180.0/math.pi
                 
                 if value_y > (1.0 - epsilon):
-                    value_y = 1.0
+                    value_y = torch.tensor(1.0)
                 elif value_y < (epsilon - 1.0):
-                    value_y = -1.0 
-                angle_y.append(np.arccos(value_y)*180.0/math.pi)
+                    value_y = torch.tensor(-1.0)
+                angle_y[i,j]=torch.arccos(value_y)*180.0/math.pi
                 
                 if value_z > (1.0 - epsilon):
-                    value_z = 1.0
+                    value_z = torch.tensor(1.0)
                 elif value_z < (epsilon - 1.0):
-                    value_z = -1.0 
-                angle_z.append(np.arccos(value_z)*180.0/math.pi)
-    angle_x = np.reshape(angle_x, [height, width])
+                    value_z = torch.tensor(-1.0)
+                angle_z[i,j]=torch.arccos(value_z)*180.0/math.pi'''
+
+    
+                
+    angle_x = torch.reshape(angle_x, [height, width])
     # signed_x = np.reshape(signed_x, [height, width])
-    angle_y = np.reshape(angle_y, [height, width])
+    angle_y = torch.reshape(angle_y, [height, width])
     # signed_y = np.reshape(signed_y, [height, width])
-    angle_z = np.reshape(angle_z, [height, width])            
+    angle_z = torch.reshape(angle_z, [height, width])            
     if args.vis_img:
+        
+        
         angle_x[angle_x==360] = 255
         angle_x = (angle_x-angle_x[angle_x<255].min())*(254/(angle_x[angle_x<255].max()-angle_x[angle_x<255].min()))
         angle_y[angle_y==360] = 255
@@ -131,14 +174,32 @@ def pseudo_nrm_angle(nrm_map):
         angle_z[angle_z==360] = 255
         angle_z = (angle_z-angle_z[angle_z<255].min())*(254/(angle_z[angle_z<255].max()-angle_z[angle_z<255].min()))
         # combine three channels and save to a png image
-        new_img_angles = np.dstack((angle_x, angle_y))
-        new_img_angles = np.dstack((new_img_angles, angle_z))
+        new_img_angles = torch.dstack((angle_x, angle_y))
+        new_img_angles = torch.dstack((new_img_angles, angle_z))
+        new_img_angles=new_img_angles.detach().cpu()
+        new_img_angles=new_img_angles.numpy()
         new_img_angles = new_img_angles.astype(np.uint8)
+        img_file = os.path.join('fast_new.png')
+        cv2.imwrite(img_file,new_img_angles)
+        ori = np.load('/workspace/DATA/Linemod_preprocessed/data/01/pseudo_nrm_angles/0000.npz')
+        pseudo = ori['angles']
+        pseudo[:,:,0][pseudo[:,:,0]==360] = 255
+        pseudo[:,:,0][pseudo[:,:,0]<255] = (pseudo[:,:,0][pseudo[:,:,0]<255]-pseudo[:,:,0][pseudo[:,:,0]<255].min())*(254/(pseudo[:,:,0][pseudo[:,:,0]<255].max()-pseudo[:,:,0][pseudo[:,:,0]<255].min()))
+        pseudo[:,:,1][pseudo[:,:,1]==360] = 255
+        pseudo[:,:,1][pseudo[:,:,1]<255] = (pseudo[:,:,1][pseudo[:,:,1]<255]-pseudo[:,:,1][pseudo[:,:,1]<255].min())*(254/(pseudo[:,:,1][pseudo[:,:,1]<255].max()-pseudo[:,:,1][pseudo[:,:,1]<255].min()))
+        pseudo[:,:,2][pseudo[:,:,2]==360] = 255
+        pseudo[:,:,2][pseudo[:,:,2]<255] = (pseudo[:,:,2][pseudo[:,:,2]<255]-pseudo[:,:,2][pseudo[:,:,2]<255].min())*(254/(pseudo[:,:,2][pseudo[:,:,2]<255].max()-pseudo[:,:,2][pseudo[:,:,2]<255].min()))
+        img_file = os.path.join('ori_new.png')
+        cv2.imwrite(img_file,pseudo)
     else:
-        new_img_angles = np.dstack((angle_x, angle_y))
-        new_img_angles = np.dstack((new_img_angles, angle_z))
+        new_img_angles = torch.dstack((angle_x, angle_y))
+        new_img_angles = torch.dstack((new_img_angles, angle_z))
+    print("running time: ",time.time()-start_time)
     return new_img_angles     
 
+def depth2show(depth):
+    show_depth = (depth / depth.max() * 256).astype("uint8")
+    return show_depth
        
 def pseudo_gen(args, dpt_xyz):
     height=480
@@ -312,7 +373,8 @@ meta_file = open(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.c
 meta_lst = yaml.safe_load(meta_file)
 
 for item_name in tqdm.tqdm(trainlist):
-
+    if args.vis_img:
+        item_name='0000'
     with Image.open(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num, "depth/{}.png".format(item_name))) as di:
         dpt_mm = np.array(di)
 
@@ -321,7 +383,20 @@ for item_name in tqdm.tqdm(trainlist):
 
     cam_scale = 1000.0
     dpt_mm = fill_missing(dpt_mm, cam_scale, 1)
-
+    import pdb;pdb.set_trace()
+    if args.vis_img:
+        # img_file = os.path.join('depth_0000.png')
+        # dpt_mm_img = depth2show(dpt_mm)
+        # cv2.imwrite(img_file,dpt_mm_img)
+        cam_scale = 1000.0
+        dpt_m = dpt_mm.astype(np.float32) / cam_scale
+        K = np.array([[572.4114, 0.,         325.2611],
+                        [0.,        573.57043,  242.04899],
+                        [0.,        0.,         1.]])
+        dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
+        dpt_xyz=dpt_xyz.reshape(480*640,3)
+        dpt_xyz=dpt_xyz[::3,:]
+        np.savetxt('pcd_0000.txt',dpt_xyz)
     dpt_mm = dpt_mm.copy().astype(np.uint16)
     nrm_map = normalSpeed.depth_normal(dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False)
 
@@ -335,11 +410,17 @@ for item_name in tqdm.tqdm(trainlist):
     # dpt_xyz[np.isnan(dpt_xyz)] = 0.0
     # dpt_xyz[np.isinf(dpt_xyz)] = 0.0
 
-    
+    start_time = time.time()
     # rgb = pseudo_gen(args, dpt_xyz)
     rgb_nrm = pseudo_nrm_angle(nrm_map)
     
+    
     if args.vis_img:
+        import pdb;pdb.set_trace()
+        img_file = os.path.join('depth_0000.png')
+        dpt_mm_img = scale_depth(dpt_mm)
+        
+        cv2.imwrite(img_file,dpt_mm_img)
         img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_cur_{}.png'.format(item_name))
         cv2.imwrite(img_file, surface_curvature)
         # img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_signed_{}.png'.format(item_name))
@@ -358,10 +439,10 @@ for item_name in tqdm.tqdm(trainlist):
         exit()
         
         
-    if not os.path.exists(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles')):
-        os.makedirs(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles'))
-    rgb_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles','{}'.format(item_name))
-    np.savez_compressed(rgb_file, angles=rgb_nrm)
+    # if not os.path.exists(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles')):
+    #     os.makedirs(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles'))
+    # rgb_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles','{}'.format(item_name))
+    # np.savez_compressed(rgb_file, angles=rgb_nrm)
 print('Finish real/ training data generation!!')
 
 

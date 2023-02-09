@@ -1,10 +1,10 @@
-import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from models.cnn.pspnet_nrmOnly import PSPNet
 import models.pytorch_utils as pt_utils
 from models.RandLA.RandLANet import Network as RandLANet
+# import swin_transformer as swin
 from mmsegmentation.mmseg.models.backbones import swin
 from mmsegmentation.mmseg.models.decode_heads import uper_head
 from mmsegmentation.mmseg import ops
@@ -26,8 +26,8 @@ class FFB6D(nn.Module):
         self.n_cls = n_classes
         self.n_pts = n_pts
         self.n_kps = n_kps
-        self.swin_ffb = swin.SwinTransformer()
-        self.psp_head = uper_head.UPerHead(in_channels=[96,192,384,768],channels=256,in_index=[0,1,2,3],num_classes=2)
+        self.swin_ffb = swin.SwinTransformer(embed_dims=96,depths=[2, 2, 18, 2],num_heads=[3, 6, 12, 24])
+        self.psp_head = uper_head.UPerHead(in_channels=[96, 192, 384, 768],channels=512,in_index=[0,1,2,3],num_classes=2)
         # self.psp_fuse_head = uper_head.UPerHead(in_channels=[192,384,768,1536],channels=256,in_index=[0,1,2,3],num_classes=2)
         self.ds_rgb_swin = [96,192,384,768]
 
@@ -111,7 +111,7 @@ class FFB6D(nn.Module):
         # You can use different prediction headers for different downstream tasks.
 
         self.rgbd_seg_layer = (
-            pt_utils.Seq(320)
+            pt_utils.Seq(576)
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
@@ -119,7 +119,7 @@ class FFB6D(nn.Module):
         )
 
         self.ctr_ofst_layer = (
-            pt_utils.Seq(320)
+            pt_utils.Seq(576)
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
@@ -127,7 +127,7 @@ class FFB6D(nn.Module):
         )
 
         self.kp_ofst_layer = (
-            pt_utils.Seq(320)
+            pt_utils.Seq(576)
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
             .conv1d(128, bn=True, activation=nn.ReLU())
@@ -240,23 +240,10 @@ class FFB6D(nn.Module):
             torch.cat([ds_pc_emb[0], f_interp_i], dim=1)
         ).squeeze(-1) # p_emb: [1, 64, 19200]
         
-        # # For data visualization
-        # import pdb;pdb.set_trace()
-        # id_ind = str(int(inputs['img_id'].cpu().numpy()[0]))
-        
-        # torch.save(inputs['cld_angle_nrm'], os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_pc.pt'))
-        # torch.save(feat_up_nrm, os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_small_img.pt'))
-        
-        
         bs, di, _, _ = feat_up_nrm.size() # feat_up_nrm: [1, 256, 120, 160]
         # feat_up_nrm = feat_up_nrm.view(bs, di, -1)
         intep = ops.Upsample(size=[h,w],mode='bilinear',align_corners=False)
         feat_final_nrm = intep(feat_up_nrm)
-        
-        # # For data visualization
-        
-        # torch.save(feat_final_nrm, os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_img.pt'))
-        
         feat_final_nrm = feat_final_nrm.view(bs, di, -1)
         choose_emb = inputs['choose'].repeat(1, di, 1)
         nrm_emb_c = torch.gather(feat_final_nrm, 2, choose_emb).contiguous() # nrm_emb_c: [1, 256, 120, 160]
@@ -266,12 +253,6 @@ class FFB6D(nn.Module):
         
         # Use simple concatenation. Good enough for fully fused RGBD feature.
         rgbd_emb = torch.cat([nrm_emb_c, p_emb], dim=1)
-        
-        
-        # # # For data visualization
-        # torch.save(rgbd_emb, os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_img_pc.pt'))
-        # torch.save(nrm_emb_c, os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_img_final.pt'))
-        # torch.save(p_emb, os.path.join('/workspace','REPO','pose_estimation','ffb6d','train_log','lm_swinTiny_phone_fullSyn_dense_fullInc','phone',id_ind+'_pc_final.pt'))
         
         # ###################### prediction stages #############################
         rgbd_segs = self.rgbd_seg_layer(rgbd_emb)
@@ -284,14 +265,12 @@ class FFB6D(nn.Module):
         pred_ctr_ofs = pred_ctr_ofs.view(
             bs, 1, 3, -1
         ).permute(0, 1, 3, 2).contiguous()
-
+        
         # return rgbd_seg, pred_kp_of, pred_ctr_of
         end_points['pred_rgbd_segs'] = rgbd_segs
         end_points['pred_kp_ofs'] = pred_kp_ofs
         end_points['pred_ctr_ofs'] = pred_ctr_ofs
 
-        
-        
         return end_points
 
 

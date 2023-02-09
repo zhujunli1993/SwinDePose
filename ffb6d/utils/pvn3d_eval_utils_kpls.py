@@ -24,8 +24,8 @@ elif opt.dataset_name=='ycb':
     bs_utils = Basic_Utils(config)
     cls_lst = config.ycb_cls_lst
 else:
-    config_lm = Config(ds_name="occlusion_linemod", cls_type=opt.occ_linemod_cls)
-    bs_utils_lm = Basic_Utils(config_lm)
+    config_lmo = Config(ds_name="occlusion_linemod", cls_type=opt.occ_linemod_cls)
+    bs_utils_lmo = Basic_Utils(config_lmo)
 
 
 
@@ -219,6 +219,50 @@ def eval_one_frame_pose(
 # ###############################End YCB Evaluation###############################
 
 # ################################Occlusion LineMod Evaluation########################
+def get_linemod_to_occlusion_transformation(object_name):
+        # https://github.com/ClayFlannigan/icp
+        if object_name == 'ape':
+            R = np.array([[-4.5991463e-08, -1.0000000e+00,  1.1828890e-08],
+                          [ 8.5046146e-08, -4.4907327e-09, -1.0000000e+00],
+                          [ 1.0000000e+00, -2.7365417e-09,  9.5073148e-08]], dtype=np.float32)
+            t = np.array([ 0.00464956, -0.04454319, -0.00454451], dtype=np.float32)
+        elif object_name == 'can':
+            R = np.array([[ 1.5503679e-07, -1.0000000e+00,  2.0980373e-07],
+                          [ 2.6769550e-08, -2.0030792e-07, -1.0000000e+00],
+                          [ 1.0000000e+00,  1.5713613e-07,  2.8610597e-08]], dtype=np.float32)
+            t = np.array([-0.009928,   -0.08974387, -0.00697199], dtype=np.float32)
+        elif object_name == 'cat':
+            R = np.array([[-7.1956642e-08, -1.0000000e+00, -7.8242387e-08],
+                          [-9.9875002e-08,  6.7945813e-08, -1.0000000e+00],
+                          [ 1.0000000e+00, -6.8791721e-08, -1.0492791e-07]], dtype=np.float32)
+            t = np.array([-0.01460595, -0.05390565,  0.00600646], dtype=np.float32)
+        elif object_name == 'driller':
+            R = np.array([[-5.8952626e-08, -9.9999994e-01,  1.7797127e-07],
+                          [ 6.7603776e-09, -1.7821345e-07, -1.0000000e+00],
+                          [ 9.9999994e-01, -5.8378635e-08,  2.7301144e-08]], dtype=np.float32)
+            t = np.array([-0.00176942, -0.10016585,  0.00840302], dtype=np.float32)
+        elif object_name == 'duck':
+            R = np.array([[-3.4352450e-07, -1.0000000e+00,  4.5238485e-07],
+                          [-6.4654046e-08, -4.5092108e-07, -1.0000000e+00],
+                          [ 1.0000000e+00, -3.4280166e-07, -4.6047357e-09]], dtype=np.float32)
+            t = np.array([-0.00285449, -0.04044429,  0.00110274], dtype=np.float32)
+        elif object_name == 'eggbox':
+            R = np.array([[-0.02, -1.00, 0.00],
+                          [-0.02, -0.00, -1.00],
+                          [1.00, -0.02, -0.02]], dtype=np.float32)
+            t = np.array([-0.01, -0.03, -0.00], dtype=np.float32)
+        elif object_name == 'glue':
+            R = np.array([[-1.2898508e-07, -1.0000000e+00,  6.7859062e-08],
+                          [ 2.9789486e-08, -6.8855734e-08, -9.9999994e-01],
+                          [ 1.0000000e+00, -1.2711939e-07,  2.9696672e-08]], dtype=np.float32)
+            t = np.array([-0.00144855, -0.07744411, -0.00468425], dtype=np.float32)
+        elif object_name == 'holepuncher':
+            R = np.array([[-5.9812328e-07, -9.9999994e-01,  3.9026276e-07],
+                          [ 8.9670505e-07, -3.8723923e-07, -1.0000001e+00],
+                          [ 1.0000000e+00, -5.9914004e-07,  8.8171902e-07]], dtype=np.float32)
+            t = np.array([-0.00425799, -0.03734197,  0.00175619], dtype=np.float32)
+        t = t.reshape((3, 1))
+        return R, t
 def cal_frame_poses_occlm(
     pcld, mask, ctr_of, pred_kp_of, gt_kps, gt_ctr, use_ctr, n_cls, use_ctr_clus_flter, obj_id,
     debug=False
@@ -275,9 +319,9 @@ def cal_frame_poses_occlm(
         #     cv2.imwrite('/workspace/REPO/pose_estimation/ffb6d/train_log/lm_1_pseudo/phone/eval_results/test.png', show_kp_img)
         #     waitKey(0)
         
-        mesh_kps = bs_utils_lm.get_kps(obj_id, ds_type="occlusion_linemod")
+        mesh_kps = bs_utils_lmo.get_kps(obj_id, ds_type="occlusion_linemod")
         if use_ctr:
-            mesh_ctr = bs_utils_lm.get_ctr(obj_id, ds_type="occlusion_linemod").reshape(1, 3)
+            mesh_ctr = bs_utils_lmo.get_ctr(obj_id, ds_type="occlusion_linemod").reshape(1, 3)
             mesh_kps = np.concatenate((mesh_kps, mesh_ctr), axis=0)
         # mesh_kps = torch.from_numpy(mesh_kps.astype(np.float32)).cuda()
         pred_RT = best_fit_transform(
@@ -288,15 +332,15 @@ def cal_frame_poses_occlm(
         
     return pred_pose_lst, cls_kps[cls_id].squeeze().contiguous().cpu().numpy(), gt_kps[0].squeeze().contiguous().cpu().numpy(), gt_ctr[0].squeeze().contiguous().cpu().numpy()
 
-def eval_metric_occlm(img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
-    n_cls = config_lm.n_classes
+def eval_metric_occlm(cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
+    n_cls = config_lmo.n_classes
     cls_add_dis = [list() for i in range(n_cls)]
     cls_adds_dis = [list() for i in range(n_cls)]
 
     pred_RT = pred_pose_lst[0]
     pred_RT = torch.from_numpy(pred_RT.astype(np.float32)).cuda()
     gt_RT = RTs[0]
-    mesh_pts = bs_utils_lm.get_pointxyz_cuda(obj_id, ds_type="occlusion_linemod").clone()
+    mesh_pts = bs_utils_lmo.get_pointxyz_cuda(obj_id, ds_type="occlusion_linemod").clone()
     
     # Check points transformed by predicted pose and GT pose, projecting them to 2D images
     # bs_utils_lm.draw_points(img_id, opt.wandb_name, obj_id, opt.linemod_cls, pred_RT, mesh_pts)
@@ -304,8 +348,8 @@ def eval_metric_occlm(img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
     # Save points transformed by predicted pose and GT pose  
     # bs_utils_lm.save_points(img_id, opt.wandb_name, opt.linemod_cls, pred_RT, gt_RT, mesh_pts)
     
-    add = bs_utils_lm.cal_add_cuda(pred_RT, gt_RT, mesh_pts)
-    adds = bs_utils_lm.cal_adds_cuda(pred_RT, gt_RT, mesh_pts)
+    add = bs_utils_lmo.cal_add_cuda(pred_RT, gt_RT, mesh_pts)
+    adds = bs_utils_lmo.cal_adds_cuda(pred_RT, gt_RT, mesh_pts)
     # print("obj_id:", obj_id, add, adds)
     # cls_add_dis[obj_id].append(add.item())
     # cls_adds_dis[obj_id].append(adds.item())
@@ -315,6 +359,27 @@ def eval_metric_occlm(img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
 
     return (cls_add_dis, cls_adds_dis)
 
+def eval_metric_occlm_vis(img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
+    n_cls = config_lmo.n_classes
+    cls_add_dis = [list() for i in range(n_cls)]
+    cls_adds_dis = [list() for i in range(n_cls)]
+
+    pred_RT = pred_pose_lst[0]
+    pred_RT = torch.from_numpy(pred_RT.astype(np.float32)).cuda()
+    gt_RT = RTs[0]
+    mesh_pts = bs_utils_lmo.get_pointxyz_cuda(obj_id, ds_type="occlusion_linemod").clone()
+    mesh_pts = mesh_pts[::2]
+    # Check points transformed by predicted pose and GT pose, projecting them to 2D images
+    bs_utils_lmo.occlm_draw_points(img_id, opt.wandb_name, obj_id, opt.occ_linemod_cls, pred_RT, mesh_pts)
+
+    # Save points transformed by predicted pose and GT pose  
+    # bs_utils_lm.save_points(img_id, opt.wandb_name, opt.linemod_cls, pred_RT, gt_RT, mesh_pts)
+
+    # print("obj_id:", obj_id, add, adds)
+    # cls_add_dis[obj_id].append(add.item())
+    # cls_adds_dis[obj_id].append(adds.item())
+
+    return (pred_RT, gt_RT)
 
 # ###############################LineMOD Evaluation###############################
 
@@ -387,6 +452,37 @@ def cal_frame_poses_lm(
         
     return pred_pose_lst, cls_kps[cls_id].squeeze().contiguous().cpu().numpy(), gt_kps[0].squeeze().contiguous().cpu().numpy(), gt_ctr[0].squeeze().contiguous().cpu().numpy()
 
+def eval_metric_lm_vis(img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id, pred_kp, gt_kp, gt_ctr):
+    
+    n_cls = config_lm.n_classes
+    # cls_add_dis = [list() for i in range(n_cls)]
+    # cls_adds_dis = [list() for i in range(n_cls)]
+
+    pred_RT = pred_pose_lst[0]
+    pred_RT = torch.from_numpy(pred_RT.astype(np.float32)).cuda()
+    gt_RT = RTs[0]
+    mesh_pts = bs_utils_lm.get_pointxyz_cuda(obj_id, ds_type="linemod").clone()
+    mesh_pts = mesh_pts[::2]
+    
+    pred_kp = torch.from_numpy(pred_kp.astype(np.float32)).cuda()
+    gt_kp = torch.from_numpy(gt_kp.astype(np.float32)).cuda()
+    gt_ctr = torch.from_numpy(gt_ctr.astype(np.float32)).cuda()
+    gt_ctr = torch.unsqueeze(gt_ctr,0)
+    gt_kps = torch.cat((gt_kp,gt_ctr),dim=0)
+    # Check points transformed by predicted pose and GT pose, projecting them to 2D images
+    bs_utils_lm.lm_draw_points(img_id, opt.wandb_name, obj_id, opt.linemod_cls, pred_RT, mesh_pts)
+    # bs_utils_lm.lm_draw_points_kp(img_id, opt.wandb_name, obj_id, opt.linemod_cls, pred_RT, gt_kps)
+    # Save points transformed by predicted pose and GT pose  
+    # bs_utils_lm.save_points(img_id, opt.wandb_name, opt.linemod_cls, pred_RT, gt_RT, mesh_pts)
+    
+    # add = bs_utils_lm.cal_add_cuda(pred_RT, gt_RT, mesh_pts)
+    # adds = bs_utils_lm.cal_adds_cuda(pred_RT, gt_RT, mesh_pts)
+    # print("obj_id:", obj_id, add, adds)
+    # cls_add_dis[obj_id].append(add.item())
+    # cls_adds_dis[obj_id].append(adds.item())
+    
+    return (pred_RT, gt_RT)
+
 
 def eval_metric_lm(img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
     
@@ -400,7 +496,7 @@ def eval_metric_lm(img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id):
     mesh_pts = bs_utils_lm.get_pointxyz_cuda(obj_id, ds_type="linemod").clone()
     
     # Check points transformed by predicted pose and GT pose, projecting them to 2D images
-    # bs_utils_lm.draw_points(img_id, opt.wandb_name, obj_id, opt.linemod_cls, pred_RT, mesh_pts)
+    # bs_utils_lm.lm_draw_points(img_id, opt.wandb_name, obj_id, opt.linemod_cls, pred_RT, mesh_pts)
     
     # Save points transformed by predicted pose and GT pose  
     # bs_utils_lm.save_points(img_id, opt.wandb_name, opt.linemod_cls, pred_RT, gt_RT, mesh_pts)
@@ -433,7 +529,36 @@ def eval_one_frame_pose_lm(
     )
     return (cls_add_dis, cls_adds_dis, pred_kp, gt_kp, gt_ctr)
 
+def vis_one_frame_pose_lm(
+    item
+):
+    
+    img_id, pcld, mask, ctr_of, pred_kp_of, gt_kp, gt_ctr, RTs, cls_ids, use_ctr, n_cls, \
+        min_cnt, use_ctr_clus_flter, label, epoch, ibs, obj_id = item
+    pred_pose_lst, pred_kp, gt_kp, gt_ctr = cal_frame_poses_lm(
+        pcld, mask, ctr_of, pred_kp_of, gt_kp, gt_ctr, use_ctr, n_cls, use_ctr_clus_flter,
+        obj_id
+    )
 
+    pred_RTs, gt_RTs = eval_metric_lm_vis(
+         img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id, pred_kp, gt_kp, gt_ctr
+    )
+    return (pred_RTs, gt_RTs, pred_kp, gt_kp, gt_ctr)
+def vis_one_frame_pose_occlm(
+    item
+):
+    
+    img_id, pcld, mask, ctr_of, pred_kp_of, gt_kp, gt_ctr, RTs, cls_ids, use_ctr, n_cls, \
+        min_cnt, use_ctr_clus_flter, label, epoch, ibs, obj_id = item
+    pred_pose_lst, pred_kp, gt_kp, gt_ctr = cal_frame_poses_occlm(
+        pcld, mask, ctr_of, pred_kp_of, gt_kp, gt_ctr, use_ctr, n_cls, use_ctr_clus_flter,
+        obj_id
+    )
+
+    pred_RTs, gt_RTs = eval_metric_occlm_vis(
+        img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id
+    )
+    return (pred_RTs, gt_RTs, pred_kp, gt_kp, gt_ctr)
 def eval_one_frame_pose_occlm(
     item
 ):
@@ -446,7 +571,7 @@ def eval_one_frame_pose_occlm(
     )
 
     cls_add_dis, cls_adds_dis = eval_metric_occlm(
-         img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id
+        img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id
     )
     return (cls_add_dis, cls_adds_dis, pred_kp, gt_kp, gt_ctr)
 # ###############################End LineMOD Evaluation###############################
@@ -535,7 +660,54 @@ class TorchEval():
             )
         )
         pkl.dump(self.pred_id2pose_lst, open(sv_pth, 'wb'))
+    def cal_lmo_add(self, obj_id, test_occ=False):
+        
+        add_auc_lst = []
+        adds_auc_lst = []
+        add_s_auc_lst = []
+        # cls_id = obj_id
+        cls_id = 0
+        if (obj_id) in config_lmo.lm_sym_cls_ids:
+            self.cls_add_s_dis[cls_id] = self.cls_adds_dis[cls_id]
+        else:
+            self.cls_add_s_dis[cls_id] = self.cls_add_dis[cls_id]
+        self.cls_add_s_dis[0] += self.cls_add_s_dis[cls_id]
+        add_auc = bs_utils_lmo.cal_auc(self.cls_add_dis[cls_id])
+        adds_auc = bs_utils_lmo.cal_auc(self.cls_adds_dis[cls_id])
+        add_s_auc = bs_utils_lmo.cal_auc(self.cls_add_s_dis[cls_id])
+        add_auc_lst.append(add_auc)
+        adds_auc_lst.append(adds_auc)
+        add_s_auc_lst.append(add_s_auc)
+        d = config_lmo.lm_r_lst[obj_id]['diameter'] / 1000.0 * 0.1
+        print("obj_id: ", obj_id, "0.1 diameter: ", d)
+        add = np.mean(np.array(self.cls_add_dis[cls_id]) < d) * 100
+        adds = np.mean(np.array(self.cls_adds_dis[cls_id]) < d) * 100
 
+        cls_type = config_lmo.lmo_id2obj_dict[obj_id]
+        print(obj_id, cls_type)
+        print("***************add auc:\t", add_auc)
+        print("***************adds auc:\t", adds_auc)
+        print("***************add(-s) auc:\t", add_s_auc)
+        print("***************add < 0.1 diameter:\t", add)
+        print("***************adds < 0.1 diameter:\t", adds)
+
+        sv_info = dict(
+            add_dis_lst=self.cls_add_dis,
+            adds_dis_lst=self.cls_adds_dis,
+            add_auc_lst=add_auc_lst,
+            adds_auc_lst=adds_auc_lst,
+            add_s_auc_lst=add_s_auc_lst,
+            add=add,
+            adds=adds,
+        )
+        occ = "occlusion" if test_occ else ""
+        sv_pth = os.path.join(
+            opt.log_eval_dir,
+            'pvn3d_eval_cuda_{}_{}_{}_{}.pkl'.format(
+                cls_type, occ, add, adds
+            )
+        )
+        pkl.dump(sv_info, open(sv_pth, 'wb'))
     def cal_lm_add(self, obj_id, test_occ=False):
         
         add_auc_lst = []
@@ -584,7 +756,77 @@ class TorchEval():
             )
         )
         pkl.dump(sv_info, open(sv_pth, 'wb'))
-
+    
+    def eval_pose_parallel_vis(
+        self, pclds, img_id, rgbs, masks, pred_ctr_ofs, gt_ctr_ofs, labels, cnt,
+        cls_ids, RTs, pred_kp_ofs, gt_kps, gt_ctrs, min_cnt=20, merge_clus=False,
+        use_ctr_clus_flter=True, use_ctr=True, obj_id=0, kp_type='farthest',
+        ds='ycb'
+    ):
+        
+        bs, n_kps, n_pts, c = pred_kp_ofs.size()
+        masks = masks.long()
+        cls_ids = cls_ids.long()
+        use_ctr_lst = [use_ctr for i in range(bs)]
+        n_cls_lst = [self.n_cls for i in range(bs)]
+        min_cnt_lst = [min_cnt for i in range(bs)]
+        epoch_lst = [cnt*bs for i in range(bs)]
+        bs_lst = [i for i in range(bs)]
+        use_ctr_clus_flter_lst = [use_ctr_clus_flter for i in range(bs)]
+        obj_id_lst = [obj_id for i in range(bs)]
+        kp_type = [kp_type for i in range(bs)]
+        if ds == "ycb":
+            data_gen = zip(
+                pclds, masks, pred_ctr_ofs, pred_kp_ofs, RTs,
+                cls_ids, use_ctr_lst, n_cls_lst, min_cnt_lst, use_ctr_clus_flter_lst,
+                labels, epoch_lst, bs_lst, gt_kps, gt_ctrs, kp_type
+            )
+        elif ds=="linemod":
+            data_gen = zip(
+                img_id, pclds, masks, pred_ctr_ofs, pred_kp_ofs, gt_kps, gt_ctrs, RTs,
+                cls_ids, use_ctr_lst, n_cls_lst, min_cnt_lst, use_ctr_clus_flter_lst,
+                labels, epoch_lst, bs_lst, obj_id_lst
+            )
+        else:
+            data_gen = zip(
+                img_id, pclds, masks, pred_ctr_ofs, pred_kp_ofs, gt_kps, gt_ctrs, RTs,
+                cls_ids, use_ctr_lst, n_cls_lst, min_cnt_lst, use_ctr_clus_flter_lst,
+                labels, epoch_lst, bs_lst, obj_id_lst
+            )
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=bs
+        ) as executor:
+        
+            if ds == "ycb":
+                eval_func = eval_one_frame_pose
+            elif ds == "linemod":
+                eval_func = vis_one_frame_pose_lm
+            else:
+                eval_func = vis_one_frame_pose_occlm
+            for res in executor.map(eval_func, data_gen):
+                if ds == 'ycb':
+                    cls_add_dis_lst, cls_adds_dis_lst, pred_cls_ids, pred_poses, pred_kp_errs = res
+                    self.pred_id2pose_lst.append(
+                        {cid: pose for cid, pose in zip(pred_cls_ids, pred_poses)}
+                    )
+                    self.pred_kp_errs = self.merge_lst(
+                        self.pred_kp_errs, pred_kp_errs
+                    )
+                elif ds == "linemod":
+                    pred_RTs, gt_RTs, pred_kp, gt_kp, gt_ctr = res
+                else:
+                    
+                    pred_RTs, gt_RTs, pred_kp, gt_kp, gt_ctr = res
+                
+                # self.cls_add_dis = self.merge_lst(
+                #     self.cls_add_dis, cls_add_dis_lst
+                # )
+                # self.cls_adds_dis = self.merge_lst(
+                #     self.cls_adds_dis, cls_adds_dis_lst
+                # )
+        
+        return (pred_RTs, gt_RTs, pred_kp, gt_kp, gt_ctr)
+    
     def eval_pose_parallel(
         self, pclds, img_id, rgbs, masks, pred_ctr_ofs, gt_ctr_ofs, labels, cnt,
         cls_ids, RTs, pred_kp_ofs, gt_kps, gt_ctrs, min_cnt=20, merge_clus=False,
@@ -609,9 +851,15 @@ class TorchEval():
                 cls_ids, use_ctr_lst, n_cls_lst, min_cnt_lst, use_ctr_clus_flter_lst,
                 labels, epoch_lst, bs_lst, gt_kps, gt_ctrs, kp_type
             )
-        else:
+        elif ds=="linemod":
             data_gen = zip(
                 img_id, pclds, masks, pred_ctr_ofs, pred_kp_ofs, gt_kps, gt_ctrs, RTs,
+                cls_ids, use_ctr_lst, n_cls_lst, min_cnt_lst, use_ctr_clus_flter_lst,
+                labels, epoch_lst, bs_lst, obj_id_lst
+            )
+        else:
+            data_gen = zip(
+                pclds, masks, pred_ctr_ofs, pred_kp_ofs, gt_kps, gt_ctrs, RTs,
                 cls_ids, use_ctr_lst, n_cls_lst, min_cnt_lst, use_ctr_clus_flter_lst,
                 labels, epoch_lst, bs_lst, obj_id_lst
             )

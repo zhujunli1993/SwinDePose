@@ -16,7 +16,7 @@ from cv2 import imshow, waitKey
 from utils import ImgPcldUtils, MeshUtils, PoseUtils, SysUtils
 
 
-SO_P = './raster_triangle/rastertriangle_so.so'
+SO_P = '/workspace/raster_triangle/rastertriangle_so.so'
 RENDERER = np.ctypeslib.load_library(SO_P, '.')
 
 mesh_utils = MeshUtils()

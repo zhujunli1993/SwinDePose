@@ -1,10 +1,10 @@
 #!/bin/bash
 GPU_NUM=7
 GPU_COUNT=1
-NAME='lm_swinTiny_driller_fullSyn_dense_fullInc'
+NAME='lm_swinTiny_ape_fullSyn_dense_fullInc'
 WANDB_PROJ='pose_estimation'
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
-CLS='driller'
+CLS='ape'
 EXP_DIR='/workspace/REPO/pose_estimation/ffb6d/train_log'
 LOG_EVAL_DIR="$EXP_DIR/$NAME/$CLS/eval_results"
 SAVE_CHECKPOINT="$EXP_DIR/$NAME/$CLS/checkpoints"

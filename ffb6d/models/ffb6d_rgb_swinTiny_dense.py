@@ -5,6 +5,7 @@ import torch.nn.functional as F
 from models.cnn.pspnet_nrmOnly import PSPNet
 import models.pytorch_utils as pt_utils
 from models.RandLA.RandLANet import Network as RandLANet
+# import swin_transformer as swin
 from mmsegmentation.mmseg.models.backbones import swin
 from mmsegmentation.mmseg.models.decode_heads import uper_head
 from mmsegmentation.mmseg import ops
@@ -197,9 +198,9 @@ class FFB6D(nn.Module):
         if not end_points:
             end_points = {}
         
-        bs, _, h, w = inputs['nrm_angles'].shape
-        feat_nrm = self.swin_ffb(inputs['nrm_angles']) # [1,96,120,160]->[1,192,60,80]->[1,384,30,40]->[1,768,15,20]
-        p_emb = inputs['cld_angle_nrm']
+        bs, _, h, w = inputs['rgb'].shape
+        feat_nrm = self.swin_ffb(inputs['rgb']) # [1,96,120,160]->[1,192,60,80]->[1,384,30,40]->[1,768,15,20]
+        p_emb = inputs['cld_rgb_nrm']
         p_emb = self.rndla_pre_stages(p_emb) #[1, 8, 19200, 1]
         p_emb = p_emb.unsqueeze(dim=3)  # Batch*channel*npoints*1
         ds_pc_emb = []

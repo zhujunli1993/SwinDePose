@@ -174,6 +174,8 @@ class Basic_Utils():
         self.lm_cls_ptsxyz_cuda_dict = {}
         self.lm_cls_kps_dict = {}
         self.lm_cls_ctr_dict = {}
+        self.lmo_cls_kps_dict = {}
+        self.lmo_cls_ctr_dict = {}
 
     def read_lines(self, p):
         with open(p, 'r') as f:
@@ -371,32 +373,50 @@ class Basic_Utils():
             show_labels[labels == cls_id, :] = cls_color
         show_labels = show_labels.reshape(h, w, 3)
         return show_labels
-
+    def get_radius(self, cls_id, r=1):
+        r = [
+            1,
+            1,
+            2,
+            2,
+            2,
+            2,
+            1,
+            2,
+            2,
+            1,
+            2,
+            1,
+            2,
+            2,
+            2,
+            2
+        ]
+        radius = r[cls_id]
+        return radius
     def get_label_color(self, cls_id, n_obj=22, mode=0):
         if mode == 0:
             cls_color = [
-                255, 255, 255,  # 0
-                180, 105, 255,   # 194, 194, 0,    # 1 # 194, 194, 0
-                0, 255, 0,      # 2
-                0, 0, 255,      # 3
-                0, 255, 255,    # 4
-                255, 0, 255,    # 5
-                180, 105, 255,  # 128, 128, 0,    # 6
-                128, 0, 0,      # 7
-                0, 128, 0,      # 8
-                0, 165, 255,    # 0, 0, 128,      # 9
-                128, 128, 0,    # 10
-                0, 0, 255,      # 11
-                255, 0, 0,      # 12
-                0, 194, 0,      # 13
-                0, 194, 0,      # 14
-                255, 255, 0,    # 15 # 0, 194, 194
-                64, 64, 0,      # 16
-                64, 0, 64,      # 17
-                185, 218, 255,  # 0, 0, 64,       # 18
-                0, 0, 255,      # 19
-                0, 64, 0,       # 20
-                0, 0, 192       # 21
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0, # lamp
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
+                17, 255, 0,
             ]
             cls_color = np.array(cls_color).reshape(-1, 3)
             color = cls_color[cls_id]
@@ -591,8 +611,10 @@ class Basic_Utils():
         if type(cls) is int:
             if ds_type == 'ycb':
                 cls = self.ycb_cls_lst[cls - 1]
-            else:
+            elif ds_type=="linemod":
                 cls = self.config.lm_id2obj_dict[cls]
+            else:
+                cls = self.config.lmo_id2obj_dict[cls]
         try:
             use_orbfps = self.config.use_orbfps
         except Exception:
@@ -608,7 +630,7 @@ class Basic_Utils():
                 )
             kps = np.loadtxt(kps_pth, dtype=np.float32)
             self.ycb_cls_kps_dict[cls] = kps
-        else:
+        elif ds_type=="linemod":
             if cls in self.lm_cls_kps_dict.keys():
                 return self.lm_cls_kps_dict[cls].copy()
             if use_orbfps:
@@ -621,6 +643,19 @@ class Basic_Utils():
             
             kps = np.loadtxt(kps_pth, dtype=np.float32)
             self.lm_cls_kps_dict[cls] = kps
+        else:
+            if cls in self.lmo_cls_kps_dict.keys():
+                return self.lmo_cls_kps_dict[cls].copy()
+            if use_orbfps:
+                kps_pth = self.config.kp_orbfps_ptn % (cls, self.config.n_keypoints)
+            else:
+                kps_pattern = os.path.join(
+                    self.config.lmo_kps_dir, "{}/{}.txt".format(cls, kp_type)
+                )
+                kps_pth = kps_pattern.format(cls)
+            
+            kps = np.loadtxt(kps_pth, dtype=np.float32)
+            self.lmo_cls_kps_dict[cls] = kps
         return kps.copy()
 
     def get_ctr(self, cls, ds_type='ycb', ctr_pth=None):
@@ -630,8 +665,10 @@ class Basic_Utils():
         if type(cls) is int:
             if ds_type == 'ycb':
                 cls = self.ycb_cls_lst[cls - 1]
-            else:
+            elif ds_type=="linemod":
                 cls = self.config.lm_id2obj_dict[cls]
+            else:
+                cls = self.config.lmo_id2obj_dict[cls]
         if ds_type == "ycb":
             if cls in self.ycb_cls_ctr_dict.keys():
                 return self.ycb_cls_ctr_dict[cls].copy()
@@ -641,7 +678,7 @@ class Basic_Utils():
             cors = np.loadtxt(cor_pattern.format(cls), dtype=np.float32)
             ctr = cors.mean(0)
             self.ycb_cls_ctr_dict[cls] = ctr
-        else:
+        elif ds_type=="linemod":
             if cls in self.lm_cls_ctr_dict.keys():
                 return self.lm_cls_ctr_dict[cls].copy()
             cor_pattern = os.path.join(
@@ -650,22 +687,103 @@ class Basic_Utils():
             cors = np.loadtxt(cor_pattern.format(cls), dtype=np.float32)
             ctr = cors.mean(0)
             self.lm_cls_ctr_dict[cls] = ctr
+        else:
+            if cls in self.lmo_cls_ctr_dict.keys():
+                return self.lmo_cls_ctr_dict[cls].copy()
+            cor_pattern = os.path.join(
+                self.config.kp_orbfps_dir, '{}_corners.txt'.format(cls),
+            )
+            cors = np.loadtxt(cor_pattern.format(cls), dtype=np.float32)
+            ctr = cors.mean(0)
+            self.lmo_cls_ctr_dict[cls] = ctr
         return ctr.copy()
-    def draw_points(self, img_id, folder_name, obj_id, obj_name, pred_RT, p3ds):
 
-        img_id = img_id.cpu().detach().numpy()
-        img_id = str(int(img_id)).zfill(4)
+    def occlm_draw_points(self, img_id, folder_name, obj_id, obj_name, pred_RT, p3ds):
+        
         pred_p3ds = torch.mm(p3ds, pred_RT[:, :3].transpose(1, 0)) + pred_RT[:, 3]
         # for cropping image
         # show_kp_img = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id)+'/crop_rgb/'+img_id+'.png')
-        show_kp_img = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id)+'/rgb/'+img_id+'.png')
+        
+        #show_kp_img = cv2.imread(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis/ape',img_id+'.png'))
+        show_kp_img = cv2.imread('/workspace/DATA/Occ_LineMod/test/000002/rgb/'+img_id.zfill(6)+'.png')
         pred_2ds = self.project_p3d(
             pred_p3ds.cpu().numpy(), 1000.0, K='linemod'
         )
-        color = (0, 0, 255)  # bs_utils.get_label_color(cls_id.item())
-        show_kp_img = self.draw_p2ds(show_kp_img, pred_2ds, r=3, color=color)
+        
+        color = self.get_label_color(obj_id)
+        # radius = self.get_radius(obj_id)
+        radius = 1
+        show_kp_img = self.draw_p2ds(show_kp_img, pred_2ds, r=radius, color=color,alpha=0.7)
         # imshow("kp: cls_id=%d" % cls_id, show_kp_img)
-        cv2.imwrite('/workspace/REPO/pose_estimation/ffb6d/train_log/'+folder_name+'/'+obj_name+'/eval_results/'+img_id+'.png', show_kp_img)
+        if not os.path.exists(os.path.join('/workspace/REPO/pose_estimation/ffb6d/Occ_LineMod_Vis',obj_name)):
+            os.makedirs(os.path.join('/workspace/REPO/pose_estimation/ffb6d/Occ_LineMod_Vis',obj_name))
+        
+        cv2.imwrite(os.path.join('/workspace/REPO/pose_estimation/ffb6d/Occ_LineMod_Vis',obj_name,img_id+'.png'), show_kp_img)
+    
+    def lm_draw_points_kp(self, img_id, folder_name, obj_id, obj_name, pred_RT, p3ds):
+        
+        pred_p3ds = p3ds
+        # for cropping image
+        # show_kp_img = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id)+'/crop_rgb/'+img_id+'.png')
+        
+        #show_kp_img = cv2.imread(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis/ape',img_id+'.png'))
+        show_kp_img = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id).zfill(2)+'/rgb/'+img_id+'.png')
+        pred_2ds = self.project_p3d(
+            pred_p3ds.cpu().numpy(), 1000.0, K='linemod'
+        )
+        
+        color = self.get_label_color(obj_id)
+        # radius = self.get_radius(obj_id)
+        radius = 3
+        show_kp_img = self.draw_p2ds(show_kp_img, pred_2ds, r=radius, color=color,alpha=1)
+        # imshow("kp: cls_id=%d" % cls_id, show_kp_img)
+        if not os.path.exists(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis_kps',obj_name)):
+            os.makedirs(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis_kps',obj_name))
+        
+        cv2.imwrite(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis_kps',obj_name,img_id+'.png'), show_kp_img)    
+    
+    def lm_draw_points(self, img_id, folder_name, obj_id, obj_name, pred_RT, p3ds):
+         
+        pred_p3ds = torch.mm(p3ds, pred_RT[:, :3].transpose(1, 0)) + pred_RT[:, 3]
+        # for cropping image
+        # show_kp_img = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id)+'/crop_rgb/'+img_id+'.png')
+        
+        #show_kp_img = cv2.imread(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis/ape',img_id+'.png'))
+        show_kp_img = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id).zfill(2)+'/rgb/'+img_id+'.png')
+        pred_2ds = self.project_p3d(
+            pred_p3ds.cpu().numpy(), 1000.0, K='linemod'
+        )
+        
+        color = self.get_label_color(obj_id)
+        # radius = self.get_radius(obj_id)
+        radius = 1
+        show_kp_img = self.draw_p2ds(show_kp_img, pred_2ds, r=radius, color=color,alpha=0.7)
+        # imshow("kp: cls_id=%d" % cls_id, show_kp_img)
+        if not os.path.exists(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis',obj_name)):
+            os.makedirs(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis',obj_name))
+        
+        cv2.imwrite(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis',obj_name,img_id+'.png'), show_kp_img)
+    def depth2show(self, depth):
+        show_depth = (depth / depth.max() * 256).astype("uint8")
+        return show_depth
+    def lm_draw_points_depth(self, img_id, folder_name, obj_id, obj_name, pred_RT, p3ds):
+         
+        pred_p3ds = torch.mm(p3ds, pred_RT[:, :3].transpose(1, 0)) + pred_RT[:, 3]
+        # for cropping image
+        # show_kp_img = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id)+'/crop_rgb/'+img_id+'.png')
+        
+
+        show_kp_img = cv2.imread('/workspace/DATA/Linemod_preprocessed/data/'+str(obj_id).zfill(2)+'/depth/'+img_id+'.png')
+        show_kp_img = self.depth2show(show_kp_img)
+        pred_2ds = self.project_p3d(pred_p3ds.cpu().numpy(), 1000.0, K='linemod')
+        color = self.get_label_color(obj_id)        
+        show_kp_img = self.draw_p2ds(show_kp_img, pred_2ds, r=1, color=color)
+        # imshow("kp: cls_id=%d" % cls_id, show_kp_img)
+        if not os.path.exists(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis',obj_name)):
+            os.makedirs(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis',obj_name))
+        
+        cv2.imwrite(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis',obj_name,img_id+'_depth.png'), show_kp_img)
+    
     def save_points(self, img_id, folder_name, obj_name, pred_RT, gt_RT, p3ds):
         img_id = img_id.cpu().detach().numpy()
         img_id = str(int(img_id)).zfill(4)

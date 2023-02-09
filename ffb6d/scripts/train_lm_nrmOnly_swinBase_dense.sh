@@ -1,7 +1,7 @@
 #!/bin/bash
-GPU_NUM=3
+GPU_NUM=2
 GPU_COUNT=1
-NAME='vtesting'
+NAME='lm_swinBase_ape_fullSyn_dense_fullInc'
 WANDB_PROJ='pose_estimation'
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
 CLS='ape'
@@ -15,7 +15,7 @@ python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 600
     --gpus=$GPU_COUNT \
     --wandb_proj $WANDB_PROJ \
     --wandb_name $NAME \
-    --num_threads 0 \
+    --num_threads 4 \
     --gpu_id $GPU_NUM \
     --gpus $GPU_COUNT \
     --gpu '0,3,6,7' \

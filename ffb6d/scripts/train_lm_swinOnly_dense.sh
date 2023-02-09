@@ -1,17 +1,17 @@
 #!/bin/bash
-GPU_NUM=1
+GPU_NUM=3
 GPU_COUNT=1
-NAME='lm_swinOnly_ape_fullSyn_dense_fullInc'
+NAME='lm_swinOnly_cat_fullSyn_dense_fullInc'
 WANDB_PROJ='pose_estimation'
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
-CLS='ape'
+CLS='cat'
 EXP_DIR='/workspace/REPO/pose_estimation/ffb6d/train_log'
 LOG_EVAL_DIR="$EXP_DIR/$NAME/$CLS/eval_results"
 SAVE_CHECKPOINT="$EXP_DIR/$NAME/$CLS/checkpoints"
 LOG_TRAININFO_DIR="$EXP_DIR/$NAME/$CLS/train_info"
 # # checkpoint to resume. 
 # tst_mdl="$SAVE_CHECKPOINT/FFB6D_$CLS.pth.tar"
-python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 60098 apps/train_lm_swinOnly.py \
+python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 60011 apps/train_lm_swinOnly.py \
     --gpus=$GPU_COUNT \
     --wandb_proj $WANDB_PROJ \
     --wandb_name $NAME \
