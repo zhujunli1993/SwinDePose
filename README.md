@@ -1,6 +1,6 @@
-# Pseudo-RGB FFB6D. 
+# SwinDePose. 
 
-## This is an implementation of FFB6D, with pseudo-RGB images as input.
+## This is the implementation of SwinDePose.
 To preview the MD file, press ctrl+k+v
 
 ### Run our FFB6D docker 
