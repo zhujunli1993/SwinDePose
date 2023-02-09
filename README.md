@@ -12,6 +12,8 @@ or
 sudo docker exec -it swin-ffb /bin/bash
 ```
 
+
+
 ### Generate LindMod Normal Angles Images 
 To generate synthetic normal angles images: 
 1. Open raster_triangle folder.
@@ -33,23 +35,18 @@ To generate real/ normal angles images: Run the codes within the folder: dataset
 python -m create_angle_npy.py --cls_num your_cls_num --train_list 'train.txt' --test_list 'test.txt'
 ```
 
-Old codes: 
-### Generate Pseudo Images 
-It will generate both XYZ pseudo and signed angles pseudo images. 
+### Train and inference the model on YCBV dataset
+0. Download codes from git.
+1. Create and go into the docker container.
+2. Go into the ffb6d folder, e.g.:
 ```bash 
-sh ffb6d/prepare_data/create_ycbv_pseudo.sh 
+cd /workspace/REPO/pose_estimation/ffb6d
 ```
-
-### Run Training Codes
-* #### Trianing FFB6D with object masks: 
-Pseudo-RGB image: 
-[angle-X, angle-Y, angle-Z, signed_angle-X, signed_angle-Y, signed_angle-Z]. 
+3. To train the model, run: 
 ```bash 
-sh scripts/train_ycb_mask.sh 
+sh scripts/train_ycb.sh
 ```
-* #### Trianing FFB6D without object masks.
-Pseudo-RGB image: 
-[angle-X, angle-Y, angle-Z, signed_angle-X, signed_angle-Y, signed_angle-Z]. 
+4. To infer the model, run:
 ```bash 
-sh scripts/train_ycb_full.sh 
+sh scripts/test_ycb.sh
 ```
