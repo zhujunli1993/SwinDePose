@@ -1,8 +1,26 @@
 # SwinDePose. 
 
-## This is the implementation of SwinDePose.
-To preview the MD file, press ctrl+k+v
+## Table of Contents  
 
+- [SwinDePose](#swindepose)
+  - [Table of Content](#table-of-content)
+  - [Introduction & Citation](#introduction--citation)
+  - [Installation](#installation)
+  - [Code Structure](#code-structure)
+  - [Datasets](#datasets)
+  - [Training and evaluating](#training-and-evaluating)
+    - [Training on the LineMOD Dataset](#training-on-the-linemod-dataset)
+    - [Evaluating on the LineMOD Dataset](#evaluating-on-the-linemod-dataset)
+    - [Demo/visualizaion on the LineMOD Dataset](#demovisualizaion-on-the-linemod-dataset)
+    - [Training on the Occ-LineMod Dataset](#training-on-the-occ_linemod-dataset)
+    - [Evaluating on the Occ-LineMod Dataset](#evaluating-on-the-Occ-LineMod-dataset)
+    - [Demo/visualization on the Occ-LineMod Dataset](#demovisualization-on-the-Occ-LineMod-dataset)
+  - [Results](#results)
+  - [License](#license)
+
+This is the official source code for the SwinDePose: Depth-based Object 6DoF Pose Estimation using Swin Transformers.
+To preview the MD file, press ctrl+k+v
+## Installation
 ### Run our FFB6D docker 
 ```bash 
 sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 --name swin-ffb -it --rm -v /raid/home/zl755:/workspace zhujunli/ffb6d:latest
