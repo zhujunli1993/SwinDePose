@@ -20,7 +20,9 @@
 
 This is the official source code for the SwinDePose: Depth-based Object 6DoF Pose Estimation using Swin Transformers.
 To preview the MD file, press ctrl+k+v
-## Installation
+
+## Introduction & Citation
+<div align=center><img width="100%" src="figs/overview_one.png"/></div>
 ### Run our FFB6D docker 
 ```bash 
 sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 --name swin-ffb -it --rm -v /raid/home/zl755:/workspace zhujunli/ffb6d:latest
