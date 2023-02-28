@@ -12,9 +12,9 @@
     - [Training on the LineMOD Dataset](#training-on-the-linemod-dataset)
     - [Evaluating on the LineMOD Dataset](#evaluating-on-the-linemod-dataset)
     - [Visualizaion on the LineMOD Dataset](#visualizaion-on-the-linemod-dataset)
-    - [Training on the Occ-LineMod Dataset](#training-on-the-occ_linemod-dataset)
-    - [Evaluating on the Occ-LineMod Dataset](#evaluating-on-the-Occ-LineMod-dataset)
-    - [Visualization on the Occ-LineMod Dataset](#visualization-on-the-Occ-LineMod-dataset)
+    - [Training on the Occ-LineMod Dataset](#training-on-the-occ-linemod-dataset)
+    - [Evaluating on the Occ-LineMod Dataset](#evaluating-on-the-occ-linemod-dataset)
+    - [Visualization on the Occ-LineMod Dataset](#visualizaion-on-the-occ-linemod-dataset)
   - [Results](#results)
   - [License](#license)
 
