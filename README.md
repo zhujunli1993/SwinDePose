@@ -11,10 +11,10 @@
   - [Training and evaluating](#training-and-evaluating)
     - [Training on the LineMOD Dataset](#training-on-the-linemod-dataset)
     - [Evaluating on the LineMOD Dataset](#evaluating-on-the-linemod-dataset)
-    - [Visualizaion on the LineMOD Dataset](#demovisualizaion-on-the-linemod-dataset)
+    - [Visualizaion on the LineMOD Dataset](#visualizaion-on-the-linemod-dataset)
     - [Training on the Occ-LineMod Dataset](#training-on-the-occ_linemod-dataset)
     - [Evaluating on the Occ-LineMod Dataset](#evaluating-on-the-Occ-LineMod-dataset)
-    - [Visualization on the Occ-LineMod Dataset](#demovisualization-on-the-Occ-LineMod-dataset)
+    - [Visualization on the Occ-LineMod Dataset](#visualization-on-the-Occ-LineMod-dataset)
   - [Results](#results)
   - [License](#license)
 
@@ -104,21 +104,14 @@ sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 
   0. Generate rendered and fused data following [raster_triangle](https://github.com/ethnhe/raster_triangle).
   1. Open raster_triangle folder. Replace its fuse.py to swin_de_pose/fuse.py and rgbd_renderer.py to swin_de_pose/rgbd_renderer.py. 
   2. Link the Linemod to the current folder. 
-        ```bash 
-        ln -s path_to_Linemod_preprocessed ./Linemod_preprocessed
-        ```
+        ``` ln -s path_to_Linemod_preprocessed ./Linemod_preprocessed ```
       Don't have to do it every time. 
   3. Render renders_nrm/ data. For example, for phone class.
-      ```bash 
-      python3 rgbd_renderer.py --cls phone --render_num 10000
-      ```
+      ``` python3 rgbd_renderer.py --cls phone --render_num 10000 ```
   4. Render fuse_nrm/ data. For example, for phone class.
-      ```bash 
-      python3 fuse.py --cls phone --fuse_num 10000
-      ```
+      ``` python3 fuse.py --cls phone --fuse_num 10000 ```
   - For **real** dataset: Open swin_de_pose/datasets/linemod/
-    ```bash 
-    python -m create_angle_npy.py --cls_num your_cls_num --train_list 'train.txt' --test_list 'test.txt'
+    ``` python -m create_angle_npy.py --cls_num your_cls_num --train_list 'train.txt' --test_list 'test.txt'
     ```
 - ### Download Occ-LindMod Dataset
   - Download the BOP Occ-LineMOD dataset from (https://bop.felk.cvut.cz/datasets/)
@@ -129,40 +122,43 @@ sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 
     ```
 
 ## Training and evaluating
+
 ### Training on the LineMOD Dataset
+
 - Train the model for the target object.
-      ```bash 
-      sh scripts/train_lm.sh
-      ```
+      ``` bash sh scripts/train_lm.sh ```
     The trained checkpoints are stored in ``experiment_name/train_log/linemod/checkpoints/{cls}/``.
+
 ### Evaluating on the LineMOD Dataset
+
 - Start evaluation by:
-      ```bash 
-      sh scripts/test_lm.sh
-      ```
+      ``` bash sh scripts/test_lm.sh ```
   You can evaluate different checkpoint by revising ``tst_mdl`` to the path of your target model.
 - **Pretrained model**: We provide our pre-trained models for each object on onedrive, [link](). Download them and move them to their according folders. For example, move the ``ape_best.pth.tar`` to ``train_log/linemod/checkpoints/ape/``. Then revise ``tst_mdl=train_log/linemod/checkpoints/ape/ape_best.path.tar`` for testing.
+
 ### Visualizaion on the LineMOD Dataset
+
 - After training your models or downloading the pre-trained models, you can visualizing the results:
-      ```bash 
-      sh scripts/test_lm_vis.sh
-      ```
+      ``` bash sh scripts/test_lm_vis.sh ```
 
 ### Training on the Occ-LineMOD Dataset
-- Train the model for the target object.
-      ```bash 
-      sh scripts/train_occlm.sh
-      ```
-    The trained checkpoints are stored in ``experiment_name/train_log/occ_linemod/checkpoints/{cls}/``.
+
+- Train the model for the target object. 
+  
+  ``` bash sh scripts/train_occlm.sh ```
+    
+    The trained checkpoints are stored in 
+    ``experiment_name/train_log/occ_linemod/checkpoints/{cls}/``.
+
 ### Evaluating on the Occ-LineMOD Dataset
+
 - Start evaluation by:
-      ```bash 
-      sh scripts/test_occlm.sh
-      ```
+      ``` bash sh scripts/test_occlm.sh ```
+
   You can evaluate different checkpoint by revising ``tst_mdl`` to the path of your target model.
 - **Pretrained model**: We provide our pre-trained models for each object on onedrive, [link](). Download them and move them to their according folders. 
+
 ### Visualizaion on the Occ-LineMOD Dataset
+
 - After training your models or downloading the pre-trained models, you can visualizing the results:
-      ```bash 
-      sh scripts/test_occlm_vis.sh
-      ```
+      ``` bash sh scripts/test_occlm_vis.sh ```
