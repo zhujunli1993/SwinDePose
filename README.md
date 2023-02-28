@@ -11,10 +11,10 @@
   - [Training and evaluating](#training-and-evaluating)
     - [Training on the LineMOD Dataset](#training-on-the-linemod-dataset)
     - [Evaluating on the LineMOD Dataset](#evaluating-on-the-linemod-dataset)
-    - [Demo/visualizaion on the LineMOD Dataset](#demovisualizaion-on-the-linemod-dataset)
+    - [Visualizaion on the LineMOD Dataset](#demovisualizaion-on-the-linemod-dataset)
     - [Training on the Occ-LineMod Dataset](#training-on-the-occ_linemod-dataset)
     - [Evaluating on the Occ-LineMod Dataset](#evaluating-on-the-Occ-LineMod-dataset)
-    - [Demo/visualization on the Occ-LineMod Dataset](#demovisualization-on-the-Occ-LineMod-dataset)
+    - [Visualization on the Occ-LineMod Dataset](#demovisualization-on-the-Occ-LineMod-dataset)
   - [Results](#results)
   - [License](#license)
 
@@ -57,8 +57,10 @@ sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 
   - **swin_de_pose/datasets**
     - **swin_de_pose/datasets/linemod/**
       - **swin_de_pose/datasets/linemod/linemod_dataset.py**: Data loader for LineMOD dataset.
+      - **swin_de_pose/datasets/linemod/create_angle_npy.py**: Generate normal vector angles images for real scene Linemod datset.
     - **swin_de_pose/datasets/occ_linemod**
       - **swin_de_pose/datasets/occ_linemod/occ_dataset.py**： Data loader for Occ-LineMOD dataset.
+      - **swin_de_pose/datasets/occ_linemod/create_angle_npy.py**：Generate normal vector angles images for Occ-Linemod datset.
   - **swin_de_pose/mmsegmentation**: packages of swin-transformer.
   - **swin_de_pose/models**
     - **swin_de_pose/models/SwinDePose.py**: Network architecture of the proposed SwinDePose.
@@ -97,11 +99,10 @@ sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 
   ```shell
   ln -s path_to_unzipped_Linemod_preprocessed ffb6d/dataset/linemod/
   ```
-  - Generate rendered and fused data following [raster_triangle](https://github.com/ethnhe/raster_triangle).
-
 - ### Generate LindMod Normal Vector Angles Images 
-  - For **synthetic** dataset: 
-  1. Open raster_triangle folder.
+  - For **synthetic** dataset:
+  0. Generate rendered and fused data following [raster_triangle](https://github.com/ethnhe/raster_triangle).
+  1. Open raster_triangle folder. Replace its fuse.py to swin_de_pose/fuse.py and rgbd_renderer.py to swin_de_pose/rgbd_renderer.py. 
   2. Link the Linemod to the current folder. 
         ```bash 
         ln -s path_to_Linemod_preprocessed ./Linemod_preprocessed
@@ -115,23 +116,53 @@ sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 
       ```bash 
       python3 fuse.py --cls phone --fuse_num 10000
       ```
-  - For **real** dataset: 
+  - For **real** dataset: Open swin_de_pose/datasets/linemod/
+    ```bash 
+    python -m create_angle_npy.py --cls_num your_cls_num --train_list 'train.txt' --test_list 'test.txt'
+    ```
+- ### Download Occ-LindMod Dataset
+  - Download the BOP Occ-LineMOD dataset from (https://bop.felk.cvut.cz/datasets/)
+- ### Generate Occ-LindMod Normal Vector Angles Images 
+  - For both **pbr_synthetic** and **real** dataset: Open swin_de_pose/datasets/occ_linemod/
     ```bash 
     python -m create_angle_npy.py --cls_num your_cls_num --train_list 'train.txt' --test_list 'test.txt'
     ```
 
-### Train and inference the model on YCBV dataset
-0. Download codes from git.
-1. Create and go into the docker container.
-2. Go into the ffb6d folder, e.g.:
-```bash 
-cd /workspace/REPO/pose_estimation/ffb6d
-```
-3. To train the model, run: 
-```bash 
-sh scripts/train_ycb.sh
-```
-4. To infer the model, run:
-```bash 
-sh scripts/test_ycb.sh
-```
+## Training and evaluating
+### Training on the LineMOD Dataset
+- Train the model for the target object.
+      ```bash 
+      sh scripts/train_lm.sh
+      ```
+    The trained checkpoints are stored in ``experiment_name/train_log/linemod/checkpoints/{cls}/``.
+### Evaluating on the LineMOD Dataset
+- Start evaluation by:
+      ```bash 
+      sh scripts/test_lm.sh
+      ```
+  You can evaluate different checkpoint by revising ``tst_mdl`` to the path of your target model.
+- **Pretrained model**: We provide our pre-trained models for each object on onedrive, [link](). Download them and move them to their according folders. For example, move the ``ape_best.pth.tar`` to ``train_log/linemod/checkpoints/ape/``. Then revise ``tst_mdl=train_log/linemod/checkpoints/ape/ape_best.path.tar`` for testing.
+### Visualizaion on the LineMOD Dataset
+- After training your models or downloading the pre-trained models, you can visualizing the results:
+      ```bash 
+      sh scripts/test_lm_vis.sh
+      ```
+
+### Training on the Occ-LineMOD Dataset
+- Train the model for the target object.
+      ```bash 
+      sh scripts/train_occlm.sh
+      ```
+    The trained checkpoints are stored in ``experiment_name/train_log/occ_linemod/checkpoints/{cls}/``.
+### Evaluating on the Occ-LineMOD Dataset
+- Start evaluation by:
+      ```bash 
+      sh scripts/test_occlm.sh
+      ```
+  You can evaluate different checkpoint by revising ``tst_mdl`` to the path of your target model.
+- **Pretrained model**: We provide our pre-trained models for each object on onedrive, [link](). Download them and move them to their according folders. 
+### Visualizaion on the Occ-LineMOD Dataset
+- After training your models or downloading the pre-trained models, you can visualizing the results:
+      ```bash 
+      sh scripts/test_occlm_vis.sh
+      ```

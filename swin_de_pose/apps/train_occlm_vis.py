@@ -21,7 +21,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_sched
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torch.optim.lr_scheduler import PolynomialLR, CyclicLR
+from torch.optim.lr_scheduler import CyclicLR
 from utils import scheduler
 import torch.backends.cudnn as cudnn
 # from ignite.handlers import param_scheduler as ps
@@ -35,7 +35,7 @@ from models.SwinDePose import SwinDePose
 from models.loss import OFLoss, FocalLoss
 from utils.pvn3d_eval_utils_kpls import TorchEval
 from utils.basic_utils import Basic_Utils
-import datasets.linemod.linemod_dataset as dataset_desc
+import datasets.occ_linemod.occ_dataset_vis as dataset_desc
 
 
 from apex.parallel import DistributedDataParallel
@@ -47,7 +47,7 @@ from apex import amp
 # get options
 opt = BaseOptions().parse()
 
-config = Config(ds_name=opt.dataset_name, cls_type=opt.linemod_cls)
+config = Config(ds_name=opt.dataset_name, cls_type=opt.occ_linemod_cls)
 bs_utils = Basic_Utils(config)
 
 # create log folders 
@@ -178,7 +178,7 @@ def model_fn_decorator(
     ):
         
         if finish_test:
-            teval.cal_lm_add(config.cls_id)
+            teval.cal_lmo_add(config.cls_id)
             return None
         if is_eval:
             model.eval()
@@ -186,75 +186,45 @@ def model_fn_decorator(
             cu_dt = {}
             # device = torch.device('cuda:{}'.format(args.local_rank))
             for key in data.keys():
-                if data[key].dtype in [np.float32, np.uint8]:
-                    cu_dt[key] = torch.from_numpy(data[key].astype(np.float32)).cuda()
-                elif data[key].dtype in [np.int32, np.uint32]:
-                    cu_dt[key] = torch.LongTensor(data[key].astype(np.int32)).cuda()
-                elif data[key].dtype in [torch.uint8, torch.float32]:
-                    cu_dt[key] = data[key].float().cuda()
-                elif data[key].dtype in [torch.int32, torch.int16]:
-                    cu_dt[key] = data[key].long().cuda()
+                img_id = data['img_id']
+                if key!='img_id':
+                    if data[key].dtype in [np.float32, np.uint8]:
+                        cu_dt[key] = torch.from_numpy(data[key].astype(np.float32)).cuda()
+                    elif data[key].dtype in [np.int32, np.uint32]:
+                        cu_dt[key] = torch.LongTensor(data[key].astype(np.int32)).cuda()
+                    elif data[key].dtype in [torch.uint8, torch.float32]:
+                        cu_dt[key] = data[key].float().cuda()
+                    elif data[key].dtype in [torch.int32, torch.int16]:
+                        cu_dt[key] = data[key].long().cuda()
             
             end_points = model(cu_dt)
             
             labels = cu_dt['labels']
-            loss_rgbd_seg = criterion(
-                end_points['pred_rgbd_segs'], labels.view(-1)
-            )
             
-            loss_kp_of = criterion_of(
-                end_points['pred_kp_ofs'], cu_dt['kp_targ_ofst'], labels
-            )
-            
-            loss_ctr_of = criterion_of(
-                end_points['pred_ctr_ofs'], cu_dt['ctr_targ_ofst'], labels
-            )
-            
-            loss_of = torch.cat((loss_kp_of, loss_ctr_of),1).mean(0)
-            loss_kp_of = loss_of[:8].mean()
-            loss_ctr_of = loss_of[-1]
-
-            loss_lst = [
-                (loss_rgbd_seg, 2.0), (loss_kp_of, 1.0), (loss_ctr_of, 1.0),
-            ]
-            loss = sum([ls * w for ls, w in loss_lst])
 
             _, cls_rgbd = torch.max(end_points['pred_rgbd_segs'], 1)
             acc_rgbd = (cls_rgbd == labels).float().sum() / labels.numel()
             
-     
+            
 
-            loss_dict = {
-                'loss_rgbd_seg': loss_rgbd_seg.item(),
-                'loss_kp_of': loss_kp_of.item(),
-                'loss_ctr_of': loss_ctr_of.item(),
-                'loss_all': loss.item(),
-                'loss_target': loss.item()
-            }
             
             acc_dict = {
                 'acc_rgbd': acc_rgbd.item(),
             }
-            info_dict = loss_dict.copy()
-            info_dict.update(acc_dict)
+
             
-            if not is_eval:
-                if opt.local_rank == 0:
-                    wandb.log({"epoch": epoch,
-                            "it": it,
-                            "training loss": loss_dict,
-                            "train_acc": acc_dict})
+            
             if is_test and test_pose:
                 cld = cu_dt['cld_angle_nrm'][:, :3, :].permute(0, 2, 1).contiguous()
                 
                 if not opt.test_gt:
                     # eval pose from point cloud prediction.
-                    add, adds, pred_kp, gt_kp, gt_ctr = teval.eval_pose_parallel(
-                        cld, cu_dt['img_id'], cu_dt['nrm_angles'], cls_rgbd, end_points['pred_ctr_ofs'],
+                    pred_RTs, gt_RTs, pred_kp, gt_kp, gt_ctr = teval.eval_pose_parallel_vis(
+                        cld, img_id, cu_dt['nrm_angles'], cls_rgbd, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],
                         cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
-                        ds='linemod', obj_id=config.cls_id,
+                        ds='occlusion_linemod', obj_id=config.cls_id,
                         min_cnt=1, use_ctr_clus_flter=True, use_ctr=True,
                     )
                 # else:
@@ -276,31 +246,25 @@ def model_fn_decorator(
                     gt_ctr_ofs = cu_dt['ctr_targ_ofst'].unsqueeze(2).permute(0, 2, 1, 3)
                     gt_kp_ofs = cu_dt['kp_targ_ofst'].permute(0, 2, 1, 3)
                     add, adds, pred_kp, gt_kp, gt_ctr = teval.eval_pose_parallel(
-                        cld, cu_dt['img_id'], cu_dt['nrm_angles'], labels, end_points['pred_ctr_ofs'],
+                        cld, img_id, cu_dt['nrm_angles'], labels, end_points['pred_ctr_ofs'],
                         cu_dt['ctr_targ_ofst'], labels, epoch, cu_dt['cls_ids'],
                         cu_dt['RTs'], end_points['pred_kp_ofs'],
                         cu_dt['kp_3ds'], cu_dt['ctr_3ds'],
-                        ds='linemod', obj_id=config.cls_id,
+                        ds='occlusion_linemod', obj_id=config.cls_id,
                         min_cnt=1, use_ctr_clus_flter=True, use_ctr=True
                     )
             if opt.eval_net:
                 test_res = {
-                'img_id':cu_dt['img_id'].item(),
-                'add': add,
-                'adds':adds,
-                'pred_kp':pred_kp,
-                'gt_kp':gt_kp,
-                'gt_ctr':gt_ctr,
+                'img_id':img_id,
+                'pred_RTs':pred_RTs,
+                'gt_RTs':gt_RTs,
                 'cld':cu_dt['cld_angle_nrm'][:,0:3,:].cpu().numpy()
             }
         if opt.eval_net:    
             return (
-            end_points, loss, info_dict, test_res
+            end_points, test_res
         )
-        else:
-            return (
-            end_points, loss, info_dict
-        )
+        
 
     return model_fn
 
@@ -352,19 +316,10 @@ class Trainer(object):
     def eval_epoch(self, d_loader, epoch,  is_test=False, test_pose=False):
         self.model.eval()
 
-        # 'loss_rgbd_seg': loss_rgbd_seg.item(),
-        #         'loss_kp_of': loss_kp_of.item(),
-        #         'loss_ctr_of': loss_ctr_of.item(),
-        #         'loss_all': loss.item(),
-        #         'loss_target': loss.item()
         if opt.eval_net:
             img_ids = []
-            loss_all = []
-            loss_kp = []
-            loss_seg = []
-            loss_ctr = []
-            add = []
-            adds = []
+            pred_RTs = []
+            gt_RTs = []
             pred_kp = []
             gt_kp = []
             gt_ctr = []
@@ -378,29 +333,16 @@ class Trainer(object):
             self.optimizer.zero_grad()
             if opt.eval_net:
                 
-                _, loss, eval_res, test_res = self.model_fn(
+                eval_res, test_res = self.model_fn(
                 self.model, data, is_eval=True, is_test=is_test, test_pose=test_pose
             )
-            else:
-                _, loss, eval_res = self.model_fn(
-                self.model, data, is_eval=True, is_test=is_test, test_pose=test_pose
-            )
+            
             if opt.eval_net:
                 img_ids.append(test_res['img_id'])
-                loss_all.append(eval_res['loss_all'])
-                loss_kp.append(eval_res['loss_kp_of'])
-                loss_seg.append(eval_res['loss_rgbd_seg'])
-                loss_ctr.append(eval_res['loss_ctr_of'])
-                add.append(test_res['add'])
-                adds.append(test_res['adds'])
-                pred_kp.append(test_res['pred_kp'])
-                gt_kp.append(test_res['gt_kp'])
-                gt_ctr.append(test_res['gt_ctr'])
+                pred_RTs.append(test_res['pred_RTs'])
+                gt_RTs.append(test_res['gt_RTs'])
                 cld.append(test_res['cld'])
-            if 'loss_target' in eval_res.keys():
-                total_loss += eval_res['loss_target']
-            else:
-                total_loss += loss.item()
+            
             for k, v in eval_res.items():
                 if v is not None:
                     eval_dict[k] = eval_dict.get(k, []) + [v]
@@ -408,17 +350,11 @@ class Trainer(object):
         if opt.eval_net:
             test_results={
             'img_ids':img_ids,
-            'loss_all':loss_all,
-            'loss_kp':loss_kp,
-            'loss_seg':loss_seg,
-            'loss_ctr':loss_ctr,
-            'add':add,
-            'adds':adds,
-            'pred_kp':pred_kp,
-            'gt_kp':gt_kp,
-            'gt_ctr':gt_ctr,
+            'pred_RTs':pred_RTs,
+            'gt_RTs':gt_RTs,
             'cld':cld
             }
+        
         
         mean_eval_dict = {}
         acc_dict = {}
@@ -513,12 +449,7 @@ class Trainer(object):
             np.random.seed()
             if log_epoch_f is not None:
                 os.system("echo {} > {}".format(start_epoch, log_epoch_f))
-            
-            
-            
             for batch in tqdm.tqdm(train_loader):
-
-                
                 self.model.train()
 
                 self.optimizer.zero_grad()
@@ -540,14 +471,14 @@ class Trainer(object):
                 if self.viz is not None:
                     self.viz.update("train", it, res)
 
-                
+                # eval_flag, eval_frequency = is_to_eval(start_epoch, it)
                 
             
             if test_loader is not None:
                 if opt.eval_net:
-                    val_loss, res, _ = self.eval_epoch(test_loader, start_epoch)
-                else:
-                    val_loss, res = self.eval_epoch(test_loader, start_epoch)
+                    res, test_res = self.eval_epoch(test_loader, start_epoch)
+                
+                
                 if val_loss < best_loss:
                     best_loss = val_loss
                     if opt.local_rank == 0:
@@ -586,38 +517,14 @@ def train():
         init_method='env://',
     )
 
-    if not opt.eval_net:
 
-        # train_ds = dataset_desc.Dataset('train', cls_type=opt.linemod_cls)
-        # train_sampler = torch.utils.data.distributed.DistributedSampler(train_ds)
-        # train_loader = torch.utils.data.DataLoader(
-        #     train_ds, batch_size=opt.mini_batch_size, shuffle=False,
-        #     drop_last=True, num_workers=opt.num_threads, sampler=train_sampler, pin_memory=opt.pin_memory
-        # )
 
-        # val_ds = dataset_desc.Dataset('test', cls_type=opt.linemod_cls)
-        # val_sampler = torch.utils.data.distributed.DistributedSampler(val_ds)
-        # val_loader = torch.utils.data.DataLoader(
-        #     val_ds, batch_size=opt.val_mini_batch_size, shuffle=False,
-        #     drop_last=False, num_workers=opt.num_threads, sampler=val_sampler
-        # )
-        train_ds = dataset_desc.Dataset('train', cls_type=opt.linemod_cls)
-        train_loader = torch.utils.data.DataLoader(
-            train_ds, batch_size=opt.mini_batch_size, shuffle=True,
-            drop_last=True, num_workers=opt.num_threads, pin_memory=opt.pin_memory
-        )
-
-        val_ds = dataset_desc.Dataset('test', cls_type=opt.linemod_cls)
-        val_loader = torch.utils.data.DataLoader(
-            val_ds, batch_size=opt.val_mini_batch_size, shuffle=True,
-            drop_last=False, num_workers=opt.num_threads
-        )
-    else:
-        test_ds = dataset_desc.Dataset('test', cls_type=opt.linemod_cls)
-        test_loader = torch.utils.data.DataLoader(
-            test_ds, batch_size=opt.test_mini_batch_size, shuffle=False,
-            num_workers=opt.num_threads
-        )
+        
+    test_ds = dataset_desc.Dataset('test', cls_type=opt.occ_linemod_cls)
+    test_loader = DataLoader(
+        test_ds, batch_size=opt.test_mini_batch_size, shuffle=False,
+        num_workers=opt.num_threads
+    )
 
     rndla_cfg = ConfigRandLA
     model = SwinDePose(
@@ -657,29 +564,8 @@ def train():
         if opt.eval_net:
             assert checkpoint_status is not None, "Failed loadding model."
 
-    if not opt.eval_net:
-        model = torch.nn.parallel.DistributedDataParallel(
-            model, device_ids=[opt.local_rank], output_device=opt.local_rank,find_unused_parameters=True
-        )
-        
-        
-        clr_div = 6 #clr_div=6
-        lr_scale = int(opt.n_total_epoch * train_ds.minibatch_per_epoch // clr_div // opt.gpus )
-        # lr_scale = opt.n_total_epoch * 10 // opt.gpus
-        # train_ds.minibatch_per_epoch= all_training_images//minibatch, clr_div=2, scale=60/2
-        lr_scheduler = CyclicLR(
-            optimizer, base_lr=1e-5, max_lr=1e-3,
-            cycle_momentum=False,
-            step_size_up=lr_scale,
-            step_size_down=lr_scale,
-            mode='triangular'
-        )# train_ds.minibatch_per_epoch=30 if mini_batch_size=6; train_ds.minibatch_per_epoch=61 if mini_batch_size=3; train_ds.minibatch_per_epoch=46 if mini_batch_size=4
-        
-        # scheduler_main = PolynomialLR(optimizer, total_iters=opt.n_total_epoch * train_ds.minibatch_per_epoch // opt.gpus, power=1.0)
-        # lr_scheduler = scheduler.GradualWarmupScheduler(optimizer, multiplier=1, total_epoch=train_ds.minibatch_per_epoch // opt.gpus, after_scheduler=scheduler_main)
-        
-    else:
-        lr_scheduler = None
+    
+    lr_scheduler = None
 
     bnm_lmbd = lambda it: max(
         opt.bn_momentum * opt.bn_decay ** (int(it * opt.mini_batch_size / opt.decay_step)),
@@ -696,66 +582,36 @@ def train():
             FocalLoss(gamma=2), OFLoss(),
             opt.test, 
         )
-    else:
-        model_fn = model_fn_decorator(
-            FocalLoss(gamma=2).to(device), OFLoss().to(device),
-            opt.test,
-        )
-
+    
     checkpoint_fd = opt.save_checkpoint
 
     trainer = Trainer(
         model,
         model_fn,
         optimizer,
-        checkpoint_name=os.path.join(checkpoint_fd, "%s" % opt.linemod_cls),
+        checkpoint_name=os.path.join(checkpoint_fd, "%s" % opt.occ_linemod_cls),
         lr_scheduler=lr_scheduler,
         bnm_scheduler=bnm_scheduler,
     )
 
     if opt.eval_net:
-        
+        start = time.time()
         _, _, test_results = trainer.eval_epoch(
             test_loader, opt.n_total_epoch, is_test=True, test_pose=opt.test_pose
         )
-        
+        end = time.time()
+        print("\nUse time: ", end - start, 's')
         
         # save test results
         img_ids = test_results['img_ids']
-        loss_all = test_results['loss_all']
-        loss_kp = test_results['loss_kp']
-        loss_seg = test_results['loss_seg']
-        loss_ctr = test_results['loss_ctr']
-        add = test_results['add']
-        adds = test_results['adds']
-        
-        pred_kp = test_results['pred_kp']
-        gt_kp = test_results['gt_kp']
-        gt_ctr = test_results['gt_ctr']
         
         cld = test_results['cld']
-        np.save(os.path.join(opt.log_eval_dir, 'pred_kp.npy'), pred_kp) 
-        np.save(os.path.join(opt.log_eval_dir, 'gt_kp.npy'), gt_kp) 
-        np.save(os.path.join(opt.log_eval_dir, 'gt_ctr.npy'), gt_ctr)  
+        
         np.save(os.path.join(opt.log_eval_dir, 'cld.npy'), cld) 
         np.savetxt(os.path.join(opt.log_eval_dir, 'img_ids.txt'),img_ids)
-        np.savetxt(os.path.join(opt.log_eval_dir, 'loss_all.txt'),loss_all)
-        np.savetxt(os.path.join(opt.log_eval_dir, 'loss_kp.txt'),loss_kp)
-        np.savetxt(os.path.join(opt.log_eval_dir, 'loss_seg.txt'),loss_seg)
-        np.savetxt(os.path.join(opt.log_eval_dir, 'loss_ctr.txt'),loss_ctr)
-        np.savetxt(os.path.join(opt.log_eval_dir, 'add.txt'),add)
-        np.savetxt(os.path.join(opt.log_eval_dir, 'adds.txt'),adds)
         
         
-    else:
-        trainer.train(
-            it, start_epoch, opt.n_total_epoch, train_loader, None,
-            val_loader, best_loss=best_loss,
-            tot_iter=opt.n_total_epoch * train_ds.minibatch_per_epoch // opt.gpus
-        )
-
-        if start_epoch == opt.n_total_epoch:
-            _ = trainer.eval_epoch(val_loader)
+    
 
 
 if __name__ == "__main__":

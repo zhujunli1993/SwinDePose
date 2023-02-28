@@ -1,21 +1,21 @@
 #!/bin/bash
-GPU_NUM=4
+GPU_NUM=1
 GPU_COUNT=1
-NAME='your_experiment_name'
 WANDB_PROJ='pose_estimation'
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
-CLS='ape'
+CLS='phone'
+NAME='your_experiment_name'
 EXP_DIR='your_experiment/swin_de_pose/train_log'
-LOG_EVAL_DIR="$EXP_DIR/$NAME/$CLS/eval_results"
+LOG_EVAL_DIR="your_experiment_name/LineMod_Vis/ape"
 SAVE_CHECKPOINT="$EXP_DIR/$NAME/$CLS/checkpoints"
 LOG_TRAININFO_DIR="$EXP_DIR/$NAME/$CLS/train_info"
-# # checkpoint to resume. 
+# checkpoint to resume. 
 tst_mdl="$SAVE_CHECKPOINT/$CLS.pth.tar"
-python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 60003 apps/train_lm.py \
+python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 60029 apps/train_lm_vis.py \
     --gpus=$GPU_COUNT \
     --wandb_proj $WANDB_PROJ \
     --wandb_name $NAME \
-    --num_threads 4 \
+    --num_threads 0 \
     --gpu_id $GPU_NUM \
     --gpus $GPU_COUNT \
     --gpu '0,3,6,7' \
@@ -24,7 +24,8 @@ python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 600
     --data_root 'your_dataset_dir/Linemod_preprocessed' \
     --train_list 'train.txt' --test_list 'test.txt' \
     --linemod_cls=$CLS \
-    --load_checkpoint $tst_mdl \
     --in_c 9 --lm_no_pbr \
-    --mini_batch_size 9 --val_mini_batch_size 9 \
+    --load_checkpoint $tst_mdl \
+    --test --test_pose --eval_net \
+    --mini_batch_size 3 --val_mini_batch_size 3 --test_mini_batch_size 1 \
     --log_eval_dir $LOG_EVAL_DIR --save_checkpoint $SAVE_CHECKPOINT --log_traininfo_dir $LOG_TRAININFO_DIR

@@ -222,22 +222,7 @@ def model_fn_decorator(
             _, cls_rgbd = torch.max(end_points['pred_rgbd_segs'], 1)
             acc_rgbd = (cls_rgbd == labels).float().sum() / labels.numel()
             
-            # Check label predictions and GT. 
-            # if True:
-                
-            #     img_id = cu_dt['img_id'].cpu().detach().numpy()
-            #     img_id = str(int(img_id)).zfill(4)
-            #     show_lb = view_labels(
-            #         data['rgb'][:,0:3,:,:], img_id, 15, data['cld_rgb_nrm'][0, :3, :], cls_rgbd
-            #     )
-            #     cv2.imwrite(os.path.join('/workspace/REPO/pose_estimation/ffb6d/train_log',opt.wandb_name,opt.linemod_cls,'eval_results/pred_lb_'+img_id+'_rgb.png'), show_lb)
-            #     show_gt_lb = view_labels(
-            #         data['rgb'][:,0:3,:,:], img_id, 15, data['cld_rgb_nrm'][0, :3, :],
-            #         cu_dt['labels'].squeeze()
-            #     )
-            #     cv2.imwrite(os.path.join('/workspace/REPO/pose_estimation/ffb6d/train_log',opt.wandb_name,opt.linemod_cls,'eval_results/gt_lb_'+img_id+'_rgb.png'), show_gt_lb)
-
-                
+    
 
             loss_dict = {
                 'loss_rgbd_seg': loss_rgbd_seg.item(),
@@ -626,7 +611,7 @@ def train():
         )
 
     rndla_cfg = ConfigRandLA
-    model = FFB6D(
+    model = SwinDePose(
         n_classes=config.n_objects, n_pts=opt.n_sample_points, rndla_cfg=rndla_cfg,
         n_kps=opt.n_keypoints
     )
@@ -714,7 +699,7 @@ def train():
         model,
         model_fn,
         optimizer,
-        checkpoint_name=os.path.join(checkpoint_fd, "FFB6D_%s" % opt.occ_linemod_cls),
+        checkpoint_name=os.path.join(checkpoint_fd, "%s" % opt.occ_linemod_cls),
         lr_scheduler=lr_scheduler,
         bnm_scheduler=bnm_scheduler,
     )
