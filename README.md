@@ -1,4 +1,4 @@
-# SwinDePose. 
+# SwinDePose
 
 ## Table of Contents  
 
