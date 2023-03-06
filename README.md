@@ -172,6 +172,22 @@ sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 
       ``` bash sh scripts/test_occlm_vis.sh ```
 
 ## Results
-To be added.
+<details>
+  <summary>[Click to expand]</summary>
+
+- **Evaluation on the LineMod Dataset**
+<div align=center><img width="100%" src="figs/table1.PNG"/></div>
+
+- **Qualitative Results on the LineMod Dataset**
+<div align=center><img width="100%" src="figs/LM_Qual_1.PNG"/></div>
+
+
+- **Evaluation on the Occlusion LineMod Dataset**
+<div align=center><img width="100%" src="figs/table2.PNG"/></div>
+
+- **Qualitative Results on the Occlusion LineMod Dataset**
+<div align=center><img width="100%" src="figs/OccLM_Qual_new.PNG"/></div>
+
+</details>
 ## License
 SwinDePose is released under the MIT License (refer to the LICENSE file for details).
