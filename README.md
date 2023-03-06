@@ -189,5 +189,6 @@ sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 
 <div align=center><img width="100%" src="figs/OccLM_Qual_new.PNG"/></div>
 
 </details>
+
 ## License
 SwinDePose is released under the MIT License (refer to the LICENSE file for details).
