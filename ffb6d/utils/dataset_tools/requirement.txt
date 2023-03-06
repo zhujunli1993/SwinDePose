@@ -1,3 +1,0 @@
-pyrender
-plyfile
-tqdm
