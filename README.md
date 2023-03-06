@@ -27,6 +27,14 @@ To preview the MD file, press ctrl+k+v
 
 Before the representation learning stage of SwinDePose, we build **normal vector angles image generation** module to generate normal vector angles images from depth images. Besides, depth images are lifted to point clouds by camera intrinsic parameters K. Then, the normal vector angles images and point clouds are fed into images and point clouds feature extraction networks to learn representations. Moreover, the learned embeddings from normal vector angles images and point clouds are fed into 3D keypoints localization module and instance segmentation module. Finally, a least-squares fitting manner is applied to estimate 6D poses. 
 
+If you find SwinDePose useful in your research, please consider citing:
+```
+@inproceedings{Li2023Depthbased6O,
+  title={Depth-based 6DoF Object Pose Estimation using Swin Transformer},
+  author={Zhujun Li and Ioannis Stamos},
+  year={2023}
+}
+```
 ## Installation - From docker 
 - Pull docker image from docker hub
 ```bash 
@@ -162,3 +170,8 @@ sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 
 
 - After training your models or downloading the pre-trained models, you can visualizing the results:
       ``` bash sh scripts/test_occlm_vis.sh ```
+
+## Results
+To be added.
+## License
+SwinDePose is released under the MIT License (refer to the LICENSE file for details).
