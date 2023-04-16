@@ -18,12 +18,12 @@
   - [Results](#results)
   - [License](#license)
 
-This is the official source code for the SwinDePose: Depth-based Object 6DoF Pose Estimation using Swin Transformers.
+This is the official source code for the SwinDePose: Depth-based Object 6DoF Pose Estimation using Swin Transformers (https://arxiv.org/abs/2303.02133).
 To preview the MD file, press ctrl+k+v
 
 ## Introduction & Citation
 <div align=center><img width="100%" src="figs/overview_one.PNG"/></div>
-[SwinDePose] is a general framework for representation learning from a depth image, and we applied it to the 6D pose estimation task by cascading downstream prediction headers for instance semantic segmentation and 3D keypoint voting prediction from FFB6D.
+SwinDePose is a general framework for representation learning from a depth image, and we applied it to the 6D pose estimation task by cascading downstream prediction headers for instance semantic segmentation and 3D keypoint voting prediction from FFB6D.
 
 Before the representation learning stage of SwinDePose, we build **normal vector angles image generation** module to generate normal vector angles images from depth images. Besides, depth images are lifted to point clouds by camera intrinsic parameters K. Then, the normal vector angles images and point clouds are fed into images and point clouds feature extraction networks to learn representations. Moreover, the learned embeddings from normal vector angles images and point clouds are fed into 3D keypoints localization module and instance segmentation module. Finally, a least-squares fitting manner is applied to estimate 6D poses. 
 
@@ -119,7 +119,8 @@ sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 
   4. Render fuse_nrm/ data. For example, for phone class.
       ``` python3 fuse.py --cls phone --fuse_num 10000 ```
   - For **real** dataset: Open swin_de_pose/datasets/linemod/
-    ``` python -m create_angle_npy.py --cls_num your_cls_num --train_list 'train.txt' --test_list 'test.txt'
+    ```bash 
+    python -m create_angle_npy.py --cls_num your_cls_num --train_list 'train.txt' --test_list 'test.txt'
     ```
 - ### Download Occ-LindMod Dataset
   - Download the BOP Occ-LineMOD dataset from (https://bop.felk.cvut.cz/datasets/)
