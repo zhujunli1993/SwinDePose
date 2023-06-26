@@ -1,0 +1,36 @@
+local_rank: 0
+cls_id in lm_dataset.py 15
+test_dataset_size:  1041
+/workspace/REPO/SwinDePose/swin_de_pose/mmsegmentation/mmseg/models/decode_heads/decode_head.py:94: UserWarning: For binary segmentation, we suggest using`out_channels = 1` to define the outputchannels of segmentor, and use `threshold`to convert seg_logist into a predictionapplying a threshold
+  warnings.warn('For binary segmentation, we suggest using'
+/workspace/REPO/SwinDePose/swin_de_pose/mmsegmentation/mmseg/models/losses/cross_entropy_loss.py:235: UserWarning: Default ``avg_non_ignore`` is False, if you would like to ignore the certain label and average loss over non-ignore labels, which is the same with PyTorch official cross_entropy, set ``avg_non_ignore=True``.
+  warnings.warn(
+Number of model parameters:  37960145
+Warning:  using Python fallback for SyncBatchNorm, possibly because apex was installed without --cuda_ext.  The exception raised when attempting to import the cuda backend was:  /opt/conda/lib/python3.8/site-packages/syncbn.cpython-38-x86_64-linux-gnu.so: undefined symbol: _ZNK2at6Tensor7optionsEv
+local_rank: 0
+Selected optimization level O0:  Pure FP32 training.
+Defaults for this optimization level are:
+enabled                : True
+opt_level              : O0
+Traceback (most recent call last):
+  File "apps/train_lm.py", line 773, in <module>
+    train()
+  File "apps/train_lm.py", line 661, in train
+    assert checkpoint_status is not None, "Failed loadding model."
+AssertionError: Failed loadding model.
+cast_model_type        : torch.float32
+patch_torch_functions  : False
+keep_batchnorm_fp32    : None
+master_weights         : False
+loss_scale             : 1.0
+Processing user overrides (additional kwargs that are not None)...
+After processing overrides, optimization options are:
+enabled                : True
+opt_level              : O0
+cast_model_type        : torch.float32
+patch_torch_functions  : False
+keep_batchnorm_fp32    : None
+master_weights         : False
+loss_scale             : 1.0
+Warning:  multi_tensor_applier fused unscale kernel is unavailable, possibly because apex was installed without --cuda_ext --cpp_ext. Using Python fallback.  Original ImportError was: ImportError('/opt/conda/lib/python3.8/site-packages/amp_C.cpython-38-x86_64-linux-gnu.so: undefined symbol: _ZNK2at6Tensor7optionsEv')
+==> Checkpoint 'train_log/final_time/phone/checkpoints/phone.pth.tar' not found

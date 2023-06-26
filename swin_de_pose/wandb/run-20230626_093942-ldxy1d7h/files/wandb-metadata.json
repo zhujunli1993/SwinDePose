@@ -1,0 +1,359 @@
+{
+    "os": "Linux-5.4.0-89-generic-x86_64-with-glibc2.10",
+    "python": "3.8.10",
+    "heartbeatAt": "2023-06-26T15:39:43.512841",
+    "startedAt": "2023-06-26T15:39:42.067866",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--local_rank=0",
+        "--gpus=1",
+        "--wandb_proj",
+        "pose_estimation",
+        "--wandb_name",
+        "final_time",
+        "--num_threads",
+        "0",
+        "--gpu_id",
+        "6",
+        "--gpus",
+        "1",
+        "--gpu",
+        "0,3,6,7",
+        "--lr",
+        "1e-2",
+        "--dataset_name",
+        "linemod",
+        "--data_root",
+        "/workspace/DATA/Linemod_preprocessed",
+        "--train_list",
+        "train.txt",
+        "--test_list",
+        "test.txt",
+        "--linemod_cls=phone",
+        "--in_c",
+        "9",
+        "--lm_no_pbr",
+        "--load_checkpoint",
+        "train_log/final_time/phone/checkpoints/phone.pth.tar",
+        "--test",
+        "--test_pose",
+        "--eval_net",
+        "--mini_batch_size",
+        "3",
+        "--val_mini_batch_size",
+        "3",
+        "--test_mini_batch_size",
+        "1",
+        "--log_eval_dir",
+        "train_log/final_time/phone/eval_results",
+        "--save_checkpoint",
+        "train_log/final_time/phone/checkpoints",
+        "--log_traininfo_dir",
+        "train_log/final_time/phone/train_info"
+    ],
+    "state": "running",
+    "program": "apps/train_lm.py",
+    "codePath": "swin_de_pose/apps/train_lm.py",
+    "git": {
+        "remote": "https://github.com/zhujunli1993/SwinDePose.git",
+        "commit": "7c40979f190698a6372b6227039291fa3dfbc941"
+    },
+    "email": null,
+    "root": "/workspace/REPO/SwinDePose",
+    "host": "165af3f2f8d5",
+    "username": "root",
+    "executable": "/opt/conda/bin/python",
+    "cpu_count": 24,
+    "cpu_count_logical": 48,
+    "cpu_freq": {
+        "current": 1387.6601875,
+        "min": 1200.0,
+        "max": 2900.0
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 1200.505,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1201.313,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1202.814,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1203.208,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1203.813,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1202.8,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.889,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.653,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1202.871,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.488,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 2829.127,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1203.415,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1202.775,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 2073.164,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1203.324,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.726,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 2761.975,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1202.286,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1203.123,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.881,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1738.42,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.839,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.041,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1201.738,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1201.571,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1201.289,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.912,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1201.504,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.512,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1201.556,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1201.0,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.354,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.892,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1201.171,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 2825.536,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1201.221,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.179,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1201.824,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.111,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.354,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 2883.327,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.406,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.513,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1227.831,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 2189.393,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.426,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.953,
+            "min": 1200.0,
+            "max": 2900.0
+        },
+        {
+            "current": 1200.941,
+            "min": 1200.0,
+            "max": 2900.0
+        }
+    ],
+    "disk": {
+        "total": 1729.894229888916,
+        "used": 477.67577362060547
+    },
+    "gpu": "Tesla V100-PCIE-32GB",
+    "gpu_count": 8,
+    "gpu_devices": [
+        {
+            "name": "Tesla V100-PCIE-32GB",
+            "memory_total": 34089730048
+        },
+        {
+            "name": "Tesla V100-PCIE-32GB",
+            "memory_total": 34089730048
+        },
+        {
+            "name": "Tesla V100-PCIE-32GB",
+            "memory_total": 34089730048
+        },
+        {
+            "name": "Tesla V100-PCIE-32GB",
+            "memory_total": 34089730048
+        },
+        {
+            "name": "Tesla V100-PCIE-32GB",
+            "memory_total": 34089730048
+        },
+        {
+            "name": "Tesla V100-PCIE-32GB",
+            "memory_total": 34089730048
+        },
+        {
+            "name": "Tesla V100-PCIE-32GB",
+            "memory_total": 34089730048
+        },
+        {
+            "name": "Tesla V100-PCIE-32GB",
+            "memory_total": 34089730048
+        }
+    ],
+    "memory": {
+        "total": 503.79358673095703
+    }
+}

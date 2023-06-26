@@ -195,7 +195,10 @@ def model_fn_decorator(
                 elif data[key].dtype in [torch.int32, torch.int16]:
                     cu_dt[key] = data[key].long().cuda()
             
+            start_time = time.time()
             end_points = model(cu_dt)
+            print("--- %s seconds ---" % (time.time() - start_time))
+            import pdb;pdb.set_trace()
             
             labels = cu_dt['labels']
             loss_rgbd_seg = criterion(

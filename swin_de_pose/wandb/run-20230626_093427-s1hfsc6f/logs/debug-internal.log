@@ -1,0 +1,170 @@
+2023-06-26 09:34:27,679 INFO    StreamThr :687 [internal.py:wandb_internal():88] W&B internal server running at pid: 687, started at: 2023-06-26 09:34:27.678377
+2023-06-26 09:34:27,682 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: status
+2023-06-26 09:34:27,686 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: status
+2023-06-26 09:34:27,688 DEBUG   SenderThread:687 [sender.py:send():303] send: header
+2023-06-26 09:34:27,688 INFO    WriterThread:687 [datastore.py:open_for_write():75] open: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/run-s1hfsc6f.wandb
+2023-06-26 09:34:27,715 DEBUG   SenderThread:687 [sender.py:send():303] send: run
+2023-06-26 09:34:27,989 INFO    SenderThread:687 [dir_watcher.py:__init__():216] watching files in: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files
+2023-06-26 09:34:27,989 INFO    SenderThread:687 [sender.py:_start_run_threads():928] run started: s1hfsc6f with start time 1687793667.673239
+2023-06-26 09:34:27,989 DEBUG   SenderThread:687 [sender.py:send():303] send: summary
+2023-06-26 09:34:27,990 INFO    SenderThread:687 [sender.py:_save_file():1171] saving file wandb-summary.json with policy end
+2023-06-26 09:34:27,996 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: check_version
+2023-06-26 09:34:27,996 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: check_version
+2023-06-26 09:34:28,078 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: run_start
+2023-06-26 09:34:28,084 DEBUG   HandlerThread:687 [system_info.py:__init__():31] System info init
+2023-06-26 09:34:28,085 DEBUG   HandlerThread:687 [system_info.py:__init__():46] System info init done
+2023-06-26 09:34:28,085 INFO    HandlerThread:687 [system_monitor.py:start():150] Starting system monitor
+2023-06-26 09:34:28,085 INFO    SystemMonitor:687 [system_monitor.py:_start():116] Starting system asset monitoring threads
+2023-06-26 09:34:28,085 INFO    HandlerThread:687 [system_monitor.py:probe():168] Collecting system info
+2023-06-26 09:34:28,086 INFO    SystemMonitor:687 [interfaces.py:start():168] Started cpu
+2023-06-26 09:34:28,086 INFO    SystemMonitor:687 [interfaces.py:start():168] Started disk
+2023-06-26 09:34:28,087 INFO    SystemMonitor:687 [interfaces.py:start():168] Started gpu
+2023-06-26 09:34:28,087 INFO    SystemMonitor:687 [interfaces.py:start():168] Started memory
+2023-06-26 09:34:28,089 INFO    SystemMonitor:687 [interfaces.py:start():168] Started network
+2023-06-26 09:34:28,993 INFO    Thread-13 :687 [dir_watcher.py:_on_file_created():275] file/dir created: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/wandb-summary.json
+2023-06-26 09:34:29,081 DEBUG   HandlerThread:687 [system_info.py:probe():195] Probing system
+2023-06-26 09:34:29,091 DEBUG   HandlerThread:687 [system_info.py:_probe_git():180] Probing git
+2023-06-26 09:34:29,112 DEBUG   HandlerThread:687 [system_info.py:_probe_git():188] Probing git done
+2023-06-26 09:34:29,112 DEBUG   HandlerThread:687 [system_info.py:probe():241] Probing system done
+2023-06-26 09:34:29,112 DEBUG   HandlerThread:687 [system_monitor.py:probe():177] {'os': 'Linux-5.4.0-89-generic-x86_64-with-glibc2.10', 'python': '3.8.10', 'heartbeatAt': '2023-06-26T15:34:29.081110', 'startedAt': '2023-06-26T15:34:27.471448', 'docker': None, 'cuda': None, 'args': ('--local_rank=0', '--gpus=1', '--wandb_proj', 'pose_estimation', '--wandb_name', 'final_time', '--num_threads', '0', '--gpu_id', '6', '--gpus', '1', '--gpu', '0,3,6,7', '--lr', '1e-2', '--dataset_name', 'linemod', '--data_root', '/workspace/DATA/Linemod_preprocessed', '--train_list', 'train.txt', '--test_list', 'test.txt', '--linemod_cls=phone', '--in_c', '9', '--lm_no_pbr', '--load_checkpoint', 'train_log/final_time/phone/checkpoints/phone.pth.tar', '--test', '--test_pose', '--eval_net', '--mini_batch_size', '3', '--val_mini_batch_size', '3', '--test_mini_batch_size', '1', '--log_eval_dir', 'train_log/final_time/phone/eval_results', '--save_checkpoint', 'train_log/final_time/phone/checkpoints', '--log_traininfo_dir', 'train_log/final_time/phone/train_info'), 'state': 'running', 'program': 'apps/train_lm.py', 'codePath': 'swin_de_pose/apps/train_lm.py', 'git': {'remote': 'https://github.com/zhujunli1993/SwinDePose.git', 'commit': '7c40979f190698a6372b6227039291fa3dfbc941'}, 'email': None, 'root': '/workspace/REPO/SwinDePose', 'host': '165af3f2f8d5', 'username': 'root', 'executable': '/opt/conda/bin/python', 'cpu_count': 24, 'cpu_count_logical': 48, 'cpu_freq': {'current': 1431.7350833333333, 'min': 1200.0, 'max': 2900.0}, 'cpu_freq_per_core': [{'current': 1200.391, 'min': 1200.0, 'max': 2900.0}, {'current': 1202.948, 'min': 1200.0, 'max': 2900.0}, {'current': 1202.769, 'min': 1200.0, 'max': 2900.0}, {'current': 1203.119, 'min': 1200.0, 'max': 2900.0}, {'current': 1203.298, 'min': 1200.0, 'max': 2900.0}, {'current': 1202.569, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.569, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.269, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.969, 'min': 1200.0, 'max': 2900.0}, {'current': 2617.137, 'min': 1200.0, 'max': 2900.0}, {'current': 2084.392, 'min': 1200.0, 'max': 2900.0}, {'current': 1202.915, 'min': 1200.0, 'max': 2900.0}, {'current': 1203.685, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.048, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.756, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.451, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.483, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.025, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.499, 'min': 1200.0, 'max': 2900.0}, {'current': 2530.897, 'min': 1200.0, 'max': 2900.0}, {'current': 2707.468, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.492, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.024, 'min': 1200.0, 'max': 2900.0}, {'current': 1369.005, 'min': 1200.0, 'max': 2900.0}, {'current': 1202.364, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.85, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.147, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.238, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.012, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.581, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.176, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.604, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.702, 'min': 1200.0, 'max': 2900.0}, {'current': 2809.326, 'min': 1200.0, 'max': 2900.0}, {'current': 1857.105, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.444, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.289, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.959, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.135, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.014, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.111, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.328, 'min': 1200.0, 'max': 2900.0}, {'current': 1200.01, 'min': 1200.0, 'max': 2900.0}, {'current': 2514.869, 'min': 1200.0, 'max': 2900.0}, {'current': 2601.521, 'min': 1200.0, 'max': 2900.0}, {'current': 1201.285, 'min': 1200.0, 'max': 2900.0}, {'current': 1202.352, 'min': 1200.0, 'max': 2900.0}, {'current': 2077.943, 'min': 1200.0, 'max': 2900.0}], 'disk': {'total': 1729.894229888916, 'used': 477.80797576904297}, 'gpu': 'Tesla V100-PCIE-32GB', 'gpu_count': 8, 'gpu_devices': [{'name': 'Tesla V100-PCIE-32GB', 'memory_total': 34089730048}, {'name': 'Tesla V100-PCIE-32GB', 'memory_total': 34089730048}, {'name': 'Tesla V100-PCIE-32GB', 'memory_total': 34089730048}, {'name': 'Tesla V100-PCIE-32GB', 'memory_total': 34089730048}, {'name': 'Tesla V100-PCIE-32GB', 'memory_total': 34089730048}, {'name': 'Tesla V100-PCIE-32GB', 'memory_total': 34089730048}, {'name': 'Tesla V100-PCIE-32GB', 'memory_total': 34089730048}, {'name': 'Tesla V100-PCIE-32GB', 'memory_total': 34089730048}], 'memory': {'total': 503.79358673095703}}
+2023-06-26 09:34:29,112 INFO    HandlerThread:687 [system_monitor.py:probe():178] Finished collecting system info
+2023-06-26 09:34:29,113 INFO    HandlerThread:687 [system_monitor.py:probe():181] Publishing system info
+2023-06-26 09:34:29,113 DEBUG   HandlerThread:687 [system_info.py:_save_pip():51] Saving list of pip packages installed into the current environment
+2023-06-26 09:34:29,114 DEBUG   HandlerThread:687 [system_info.py:_save_pip():67] Saving pip packages done
+2023-06-26 09:34:29,114 DEBUG   HandlerThread:687 [system_info.py:_save_conda():74] Saving list of conda packages installed into the current environment
+2023-06-26 09:34:30,000 INFO    Thread-13 :687 [dir_watcher.py:_on_file_created():275] file/dir created: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/requirements.txt
+2023-06-26 09:34:30,000 INFO    Thread-13 :687 [dir_watcher.py:_on_file_created():275] file/dir created: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/conda-environment.yaml
+2023-06-26 09:34:32,091 DEBUG   HandlerThread:687 [system_info.py:_save_conda():86] Saving conda packages done
+2023-06-26 09:34:32,094 INFO    HandlerThread:687 [system_monitor.py:probe():183] Finished publishing system info
+2023-06-26 09:34:32,256 DEBUG   SenderThread:687 [sender.py:send():303] send: files
+2023-06-26 09:34:32,257 INFO    SenderThread:687 [sender.py:_save_file():1171] saving file wandb-metadata.json with policy now
+2023-06-26 09:34:32,272 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: stop_status
+2023-06-26 09:34:32,274 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: stop_status
+2023-06-26 09:34:32,363 DEBUG   SenderThread:687 [sender.py:send():303] send: telemetry
+2023-06-26 09:34:32,777 INFO    Thread-16 :687 [upload_job.py:push():143] Uploaded file /tmp/tmpfes8wf9gwandb/2yg7feq9-wandb-metadata.json
+2023-06-26 09:34:33,001 INFO    Thread-13 :687 [dir_watcher.py:_on_file_created():275] file/dir created: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/wandb-metadata.json
+2023-06-26 09:34:33,001 INFO    Thread-13 :687 [dir_watcher.py:_on_file_created():275] file/dir created: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/output.log
+2023-06-26 09:34:35,002 INFO    Thread-13 :687 [dir_watcher.py:_on_file_modified():292] file/dir modified: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/output.log
+2023-06-26 09:34:37,004 INFO    Thread-13 :687 [dir_watcher.py:_on_file_modified():292] file/dir modified: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/output.log
+2023-06-26 09:34:38,004 INFO    Thread-13 :687 [dir_watcher.py:_on_file_modified():292] file/dir modified: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/output.log
+2023-06-26 09:34:39,005 INFO    Thread-13 :687 [dir_watcher.py:_on_file_modified():292] file/dir modified: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/output.log
+2023-06-26 09:34:39,431 DEBUG   SenderThread:687 [sender.py:send():303] send: exit
+2023-06-26 09:34:39,431 INFO    SenderThread:687 [sender.py:send_exit():442] handling exit code: 1
+2023-06-26 09:34:39,431 INFO    SenderThread:687 [sender.py:send_exit():444] handling runtime: 11
+2023-06-26 09:34:39,614 INFO    SenderThread:687 [sender.py:_save_file():1171] saving file wandb-summary.json with policy end
+2023-06-26 09:34:39,614 INFO    SenderThread:687 [sender.py:send_exit():450] send defer
+2023-06-26 09:34:39,615 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:39,615 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 0
+2023-06-26 09:34:39,615 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:39,615 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 0
+2023-06-26 09:34:39,615 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 1
+2023-06-26 09:34:39,616 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:39,616 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 1
+2023-06-26 09:34:39,616 INFO    HandlerThread:687 [system_monitor.py:finish():160] Stopping system monitor
+2023-06-26 09:34:39,617 DEBUG   SystemMonitor:687 [system_monitor.py:_start():130] Starting system metrics aggregation loop
+2023-06-26 09:34:39,617 DEBUG   SystemMonitor:687 [system_monitor.py:_start():137] Finished system metrics aggregation loop
+2023-06-26 09:34:39,617 DEBUG   SystemMonitor:687 [system_monitor.py:_start():141] Publishing last batch of metrics
+2023-06-26 09:34:39,619 INFO    HandlerThread:687 [interfaces.py:finish():173] Joined cpu
+2023-06-26 09:34:39,619 INFO    HandlerThread:687 [interfaces.py:finish():173] Joined disk
+2023-06-26 09:34:39,695 INFO    HandlerThread:687 [interfaces.py:finish():173] Joined gpu
+2023-06-26 09:34:39,695 INFO    HandlerThread:687 [interfaces.py:finish():173] Joined memory
+2023-06-26 09:34:39,695 INFO    HandlerThread:687 [interfaces.py:finish():173] Joined network
+2023-06-26 09:34:39,695 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:39,696 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 1
+2023-06-26 09:34:39,696 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 2
+2023-06-26 09:34:39,696 DEBUG   SenderThread:687 [sender.py:send():303] send: stats
+2023-06-26 09:34:39,697 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:39,697 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 2
+2023-06-26 09:34:39,697 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:39,698 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 2
+2023-06-26 09:34:39,698 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 3
+2023-06-26 09:34:39,698 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:39,698 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 3
+2023-06-26 09:34:39,699 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:39,699 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 3
+2023-06-26 09:34:39,699 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 4
+2023-06-26 09:34:39,699 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:39,699 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 4
+2023-06-26 09:34:39,700 DEBUG   SenderThread:687 [sender.py:send():303] send: summary
+2023-06-26 09:34:39,700 INFO    SenderThread:687 [sender.py:_save_file():1171] saving file wandb-summary.json with policy end
+2023-06-26 09:34:39,701 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:39,701 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 4
+2023-06-26 09:34:39,701 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 5
+2023-06-26 09:34:39,701 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:39,702 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 5
+2023-06-26 09:34:39,702 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:39,702 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 5
+2023-06-26 09:34:39,888 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 6
+2023-06-26 09:34:39,888 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:39,889 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 6
+2023-06-26 09:34:39,889 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:39,889 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 6
+2023-06-26 09:34:40,006 INFO    Thread-13 :687 [dir_watcher.py:_on_file_modified():292] file/dir modified: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/wandb-summary.json
+2023-06-26 09:34:40,006 INFO    Thread-13 :687 [dir_watcher.py:_on_file_modified():292] file/dir modified: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/config.yaml
+2023-06-26 09:34:40,006 INFO    Thread-13 :687 [dir_watcher.py:_on_file_modified():292] file/dir modified: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/output.log
+2023-06-26 09:34:40,432 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: poll_exit
+2023-06-26 09:34:41,006 INFO    Thread-13 :687 [dir_watcher.py:_on_file_modified():292] file/dir modified: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/output.log
+2023-06-26 09:34:41,969 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 7
+2023-06-26 09:34:41,969 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: poll_exit
+2023-06-26 09:34:41,970 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:41,971 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 7
+2023-06-26 09:34:41,971 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:41,971 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 7
+2023-06-26 09:34:41,971 INFO    SenderThread:687 [dir_watcher.py:finish():362] shutting down directory watcher
+2023-06-26 09:34:42,007 INFO    Thread-13 :687 [dir_watcher.py:_on_file_modified():292] file/dir modified: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/output.log
+2023-06-26 09:34:42,008 INFO    SenderThread:687 [dir_watcher.py:finish():392] scan: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files
+2023-06-26 09:34:42,008 INFO    SenderThread:687 [dir_watcher.py:finish():406] scan save: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/output.log output.log
+2023-06-26 09:34:42,008 INFO    SenderThread:687 [dir_watcher.py:finish():406] scan save: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/wandb-summary.json wandb-summary.json
+2023-06-26 09:34:42,020 INFO    SenderThread:687 [dir_watcher.py:finish():406] scan save: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/config.yaml config.yaml
+2023-06-26 09:34:42,031 INFO    SenderThread:687 [dir_watcher.py:finish():406] scan save: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/conda-environment.yaml conda-environment.yaml
+2023-06-26 09:34:42,039 INFO    SenderThread:687 [dir_watcher.py:finish():406] scan save: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/wandb-metadata.json wandb-metadata.json
+2023-06-26 09:34:42,039 INFO    SenderThread:687 [dir_watcher.py:finish():406] scan save: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/requirements.txt requirements.txt
+2023-06-26 09:34:42,047 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 8
+2023-06-26 09:34:42,053 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:42,058 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 8
+2023-06-26 09:34:42,062 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:42,062 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 8
+2023-06-26 09:34:42,062 INFO    SenderThread:687 [file_pusher.py:finish():168] shutting down file pusher
+2023-06-26 09:34:42,393 INFO    Thread-17 :687 [upload_job.py:push():143] Uploaded file /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/output.log
+2023-06-26 09:34:42,395 INFO    Thread-18 :687 [upload_job.py:push():143] Uploaded file /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/wandb-summary.json
+2023-06-26 09:34:42,403 INFO    Thread-20 :687 [upload_job.py:push():143] Uploaded file /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/requirements.txt
+2023-06-26 09:34:42,405 INFO    Thread-19 :687 [upload_job.py:push():143] Uploaded file /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/files/config.yaml
+2023-06-26 09:34:42,606 INFO    Thread-12 :687 [sender.py:transition_state():463] send defer: 9
+2023-06-26 09:34:42,606 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:42,607 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 9
+2023-06-26 09:34:42,607 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:42,607 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 9
+2023-06-26 09:34:42,607 INFO    SenderThread:687 [file_pusher.py:join():173] waiting for file pusher
+2023-06-26 09:34:42,607 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 10
+2023-06-26 09:34:42,608 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:42,608 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 10
+2023-06-26 09:34:42,608 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:42,608 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 10
+2023-06-26 09:34:42,728 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 11
+2023-06-26 09:34:42,728 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:42,728 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 11
+2023-06-26 09:34:42,729 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:42,729 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 11
+2023-06-26 09:34:42,729 INFO    SenderThread:687 [sender.py:transition_state():463] send defer: 12
+2023-06-26 09:34:42,730 DEBUG   SenderThread:687 [sender.py:send():303] send: final
+2023-06-26 09:34:42,730 DEBUG   SenderThread:687 [sender.py:send():303] send: footer
+2023-06-26 09:34:42,731 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: defer
+2023-06-26 09:34:42,731 INFO    HandlerThread:687 [handler.py:handle_request_defer():162] handle defer: 12
+2023-06-26 09:34:42,731 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: defer
+2023-06-26 09:34:42,731 INFO    SenderThread:687 [sender.py:send_request_defer():459] handle sender defer: 12
+2023-06-26 09:34:42,732 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: poll_exit
+2023-06-26 09:34:42,733 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: poll_exit
+2023-06-26 09:34:42,734 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: server_info
+2023-06-26 09:34:42,734 DEBUG   SenderThread:687 [sender.py:send_request():317] send_request: server_info
+2023-06-26 09:34:42,743 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: get_summary
+2023-06-26 09:34:42,744 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: sampled_history
+2023-06-26 09:34:42,907 INFO    MainThread:687 [wandb_run.py:_footer_history_summary_info():3377] rendering history
+2023-06-26 09:34:42,907 INFO    MainThread:687 [wandb_run.py:_footer_history_summary_info():3409] rendering summary
+2023-06-26 09:34:42,907 INFO    MainThread:687 [wandb_run.py:_footer_sync_info():3333] logging synced files
+2023-06-26 09:34:42,908 DEBUG   HandlerThread:687 [handler.py:handle_request():139] handle_request: shutdown
+2023-06-26 09:34:42,908 INFO    HandlerThread:687 [handler.py:finish():814] shutting down handler
+2023-06-26 09:34:43,731 INFO    WriterThread:687 [datastore.py:close():279] close: /workspace/REPO/SwinDePose/swin_de_pose/wandb/run-20230626_093427-s1hfsc6f/run-s1hfsc6f.wandb
+2023-06-26 09:34:43,906 INFO    SenderThread:687 [sender.py:finish():1331] shutting down sender
+2023-06-26 09:34:43,906 INFO    SenderThread:687 [file_pusher.py:finish():168] shutting down file pusher
+2023-06-26 09:34:43,907 INFO    SenderThread:687 [file_pusher.py:join():173] waiting for file pusher
+2023-06-26 09:34:43,911 INFO    MainThread:687 [internal.py:handle_exit():78] Internal process exited
