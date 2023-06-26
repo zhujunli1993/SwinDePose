@@ -38,13 +38,21 @@ If you find SwinDePose useful in your research, please consider citing:
 ## Installation - From docker 
 - Pull docker image from docker hub
 ```bash 
-docker pull zhujunli/swin-pose
+docker pull zhujunli/swin-pose:latest
 ```
 - Run our swin-pose docker
 ```bash 
-sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 --name swin-ffb -it --rm -v your_workspace_directory:/workspace zhujunli/swin-pose
+sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 --name swin-ffb -it --rm -v your_workspace_directory:/workspace zhujunli/swin-pose:latest
 ```
-
+- Install mmseg within docker
+```bash 
+pip install -r mmseg_install.txt
+```
+- Install some neccessary package
+```bash 
+cd models/RandLA
+sh compile_op.sh
+```
 ## Code Structure
 
 <details>
