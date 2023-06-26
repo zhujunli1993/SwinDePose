@@ -1,0 +1,3 @@
+mmcv-full==1.7.0
+# Editable install with no version control (mmsegmentation==0.29.1)
+-e /workspace/REPO/SwinDePose/swin_de_pose/mmsegmentation
