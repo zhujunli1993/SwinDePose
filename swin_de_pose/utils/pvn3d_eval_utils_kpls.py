@@ -523,19 +523,17 @@ def cal_frame_poses_lab(
         )
         
         # visualize projected object
-        if False:
+        if opt.lab_vis:
             
             mesh_pts = bs_utils_lab.get_pointxyz_cuda(cls_id, ds_type="lab").clone()
             mesh_pts = mesh_pts[::2]
             show_kp_img = np.zeros((480, 640, 3), np.uint8)
-            output_path = '/workspace/DATA/LabROS/all_vis_'+str(cls_id)+'.png'
-            input_path = '/workspace/DATA/LabROS/data/all.jpg'
-            
-            kp_2ds = bs_utils_lab.lab_draw_points(
-                output_path, input_path, cls_id, torch.from_numpy(pred_RT).double(), mesh_pts.cpu().double()
+
+            _ = bs_utils_lab.lab_draw_points(
+                opt.lab_vis_output, opt.lab_vis_input, cls_id, torch.from_numpy(pred_RT).double(), mesh_pts.cpu().double()
             )
             
-            waitKey(0)
+            
         
     return pred_RT
 
