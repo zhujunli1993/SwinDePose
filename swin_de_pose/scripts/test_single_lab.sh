@@ -1,5 +1,5 @@
 #!/bin/bash
-GPU_NUM=6
+GPU_NUM=0
 GPU_COUNT=1
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
 CLS='ape'
@@ -16,7 +16,7 @@ python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 600
     --dataset_name 'lab' \
     --data_root '/workspace/DATA/LabROS' \
     --lab_depth_input '/workspace/DATA/LabROS/data/all_depth.npy' \
-    --lab_pose_save '/workspace/DATA/LabROS' \
+    --lab_pose_save '/workspace/DATA/LabROS/all_ape_pred.txt' \
     --linemod_cls $CLS \
     --in_c 9 --lm_no_pbr \
     --load_checkpoint $tst_mdl \

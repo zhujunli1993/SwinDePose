@@ -460,9 +460,9 @@ def train():
         pred_pose = trainer.eval_epoch(
             test_loader, opt.n_total_epoch, is_test=True, test_pose=opt.test_pose
         )
-        print("-------------------Estimation Result---------------------------\n")
+        print("-------------------Estimation Result for "+opt.linemod_cls+" ---------------------------\n")
         print(pred_pose)
-        np.savetxt(os.path.join(opt.lab_pose_save, opt.linemod_cls+'_pred.txt'),pred_pose)
+        np.savetxt(opt.lab_pose_save,pred_pose)
         
         # save test results
         
