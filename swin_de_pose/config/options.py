@@ -21,6 +21,8 @@ class BaseOptions():
         g_data.add_argument('--width', type=int, default=640, help='YCBV image width, default = 640')
         g_data.add_argument('--height', type=int, default=480, help='YCBV image height, default = 480')
         g_data.add_argument('--data_root', type=str, help='Dataset Location.')
+        g_data.add_argument('--lab_depth_input', type=str, help='Lab depth image input (.npz).')
+        g_data.add_argument('--lab_pose_save', type=str, help='Lab pose output folder.')
         g_data.add_argument('--rm_outline', action='store_true', help='Remove points with too small depth value from depth image.')
         g_data.add_argument('--angles_gen', type=str,  help='The C++ codes directory for generating XYZ angles and signed angles file.')
         g_data.add_argument('--train_list', type=str,  help='training list.')

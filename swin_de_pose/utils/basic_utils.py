@@ -27,7 +27,10 @@ intrinsic_matrix = {
                         [0.      , 0.        , 1.0]], np.float32),
     'ycb_K2': np.array([[1077.836, 0.        , 323.7872],
                         [0.      , 1078.189  , 279.6921],
-                        [0.      , 0.        , 1.0]], np.float32)
+                        [0.      , 0.        , 1.0]], np.float32),
+    'lab': np.array([[528.1860, 0, 324.61160],
+                     [0, 520.4914, 234.4936],
+                     [0, 0, 1]], np.float32)
 }
 
 
@@ -574,7 +577,7 @@ class Basic_Utils():
             return pointxyz
         else:
             ptxyz_pth = os.path.join(
-                '/workspace/DATA/Linemod_preprocessed/models',
+                self.config.lm_root,'models',
                 'obj_%02d.ply' % cls
             )
             pointxyz = self.ply_vtx(ptxyz_pth) / 1000.0
@@ -593,6 +596,13 @@ class Basic_Utils():
             ptsxyz = self.get_pointxyz(cls, ds_type)
             ptsxyz_cu = torch.from_numpy(ptsxyz.astype(np.float32)).cuda()
             self.ycb_cls_ptsxyz_cuda_dict[cls] = ptsxyz_cu
+            return ptsxyz_cu.clone()
+        elif ds_type=='lab':
+            if cls in self.lm_cls_ptsxyz_cuda_dict.keys():
+                return self.lm_cls_ptsxyz_cuda_dict[cls].clone()
+            ptsxyz = self.get_pointxyz(cls, ds_type)
+            ptsxyz_cu = torch.from_numpy(ptsxyz.astype(np.float32)).cuda()
+            self.lm_cls_ptsxyz_cuda_dict[cls] = ptsxyz_cu
             return ptsxyz_cu.clone()
         else:
             if cls in self.lm_cls_ptsxyz_cuda_dict.keys():
@@ -613,6 +623,8 @@ class Basic_Utils():
                 cls = self.ycb_cls_lst[cls - 1]
             elif ds_type=="linemod":
                 cls = self.config.lm_id2obj_dict[cls]
+            elif ds_type=="lab":
+                cls = self.config.lm_id2obj_dict[cls]
             else:
                 cls = self.config.lmo_id2obj_dict[cls]
         try:
@@ -631,6 +643,19 @@ class Basic_Utils():
             kps = np.loadtxt(kps_pth, dtype=np.float32)
             self.ycb_cls_kps_dict[cls] = kps
         elif ds_type=="linemod":
+            if cls in self.lm_cls_kps_dict.keys():
+                return self.lm_cls_kps_dict[cls].copy()
+            if use_orbfps:
+                kps_pth = self.config.kp_orbfps_ptn % (cls, self.config.n_keypoints)
+            else:
+                kps_pattern = os.path.join(
+                    self.config.lm_kps_dir, "{}/{}.txt".format(cls, kp_type)
+                )
+                kps_pth = kps_pattern.format(cls)
+            
+            kps = np.loadtxt(kps_pth, dtype=np.float32)
+            self.lm_cls_kps_dict[cls] = kps
+        elif ds_type=="lab":
             if cls in self.lm_cls_kps_dict.keys():
                 return self.lm_cls_kps_dict[cls].copy()
             if use_orbfps:
@@ -667,6 +692,8 @@ class Basic_Utils():
                 cls = self.ycb_cls_lst[cls - 1]
             elif ds_type=="linemod":
                 cls = self.config.lm_id2obj_dict[cls]
+            elif ds_type=="lab":
+                cls = self.config.lm_id2obj_dict[cls]
             else:
                 cls = self.config.lmo_id2obj_dict[cls]
         if ds_type == "ycb":
@@ -679,6 +706,15 @@ class Basic_Utils():
             ctr = cors.mean(0)
             self.ycb_cls_ctr_dict[cls] = ctr
         elif ds_type=="linemod":
+            if cls in self.lm_cls_ctr_dict.keys():
+                return self.lm_cls_ctr_dict[cls].copy()
+            cor_pattern = os.path.join(
+                self.config.kp_orbfps_dir, '{}_corners.txt'.format(cls),
+            )
+            cors = np.loadtxt(cor_pattern.format(cls), dtype=np.float32)
+            ctr = cors.mean(0)
+            self.lm_cls_ctr_dict[cls] = ctr
+        elif ds_type=="lab":
             if cls in self.lm_cls_ctr_dict.keys():
                 return self.lm_cls_ctr_dict[cls].copy()
             cor_pattern = os.path.join(
@@ -763,6 +799,25 @@ class Basic_Utils():
             os.makedirs(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis',obj_name))
         
         cv2.imwrite(os.path.join('/workspace/REPO/pose_estimation/ffb6d/LineMod_Vis',obj_name,img_id+'.png'), show_kp_img)
+    
+    def lab_draw_points(self, output_path, input_path, cat_id, pred_RT, p3ds):
+         
+        pred_p3ds = torch.mm(p3ds, pred_RT[:, :3].transpose(1, 0)) + pred_RT[:, 3]
+        
+        show_kp_img = cv2.imread(input_path)
+        pred_2ds = self.project_p3d(
+            pred_p3ds.cpu().numpy(), 1000.0, K='lab'
+        )
+        
+        color = self.get_label_color(cat_id)
+        # radius = self.get_radius(obj_id)
+        radius = 1
+        show_kp_img = self.draw_p2ds(show_kp_img, pred_2ds, r=radius, color=color,alpha=0.7)
+        # imshow("kp: cls_id=%d" % cls_id, show_kp_img)
+        
+        cv2.imwrite(output_path, show_kp_img)
+        
+        
     def depth2show(self, depth):
         show_depth = (depth / depth.max() * 256).astype("uint8")
         return show_depth

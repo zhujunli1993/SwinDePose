@@ -20,6 +20,9 @@ opt = BaseOptions().parse()
 if opt.dataset_name=='linemod':
     config_lm = Config(ds_name="linemod", cls_type=opt.linemod_cls)
     bs_utils_lm = Basic_Utils(config_lm)
+elif opt.dataset_name=='lab':
+    config_lab = Config(ds_name="lab", cls_type=opt.linemod_cls)
+    bs_utils_lab = Basic_Utils(config_lab)
 elif opt.dataset_name=='ycb':
     config = Config(ds_name='ycb')
     bs_utils = Basic_Utils(config)
@@ -453,6 +456,89 @@ def cal_frame_poses_lm(
         
     return pred_pose_lst, cls_kps[cls_id].squeeze().contiguous().cpu().numpy(), gt_kps[0].squeeze().contiguous().cpu().numpy(), gt_ctr[0].squeeze().contiguous().cpu().numpy()
 
+def cal_frame_poses_lab(
+    cls_id, pcld, mask, pred_ctr_of, pred_kp_of, use_ctr, n_cls, use_ctr_clus_flter, obj_id,
+    debug=False
+):
+    """
+    Calculates pose parameters by 3D keypoints & center points voting to build
+    the 3D-3D corresponding then use least-squares fitting to get the pose parameters.
+    """
+     
+    n_kps, n_pts, _ = pred_kp_of.size()
+    pred_ctr = pcld - pred_ctr_of[0]
+    pred_kp = pcld.view(1, n_pts, 3).repeat(n_kps, 1, 1) - pred_kp_of
+
+    radius = 0.04
+    if use_ctr:
+        cls_kps = torch.zeros(n_cls, n_kps+1, 3).cuda()
+    else:
+        cls_kps = torch.zeros(n_cls, n_kps, 3).cuda()
+
+    pred_pose_lst = []
+    cls_id_single = 1
+    cls_msk = mask == cls_id_single
+    if cls_msk.sum() < 1:
+        pred_pose_lst.append(np.identity(4)[:3, :])
+    else:
+        cls_voted_kps = pred_kp[:, cls_msk, :]
+        # for i in range(8):   
+        #     np.savetxt(str(i)+'_pred_kps_rgb.txt', cls_voted_kps[i,:,:].squeeze().cpu())
+        ms = MeanShiftTorch(bandwidth=radius)
+        ctr, ctr_labels = ms.fit(pred_ctr[cls_msk, :])
+        if ctr_labels.sum() < 1:
+            ctr_labels[0] = 1
+        if use_ctr:
+            cls_kps[cls_id_single, n_kps, :] = ctr
+
+        if use_ctr_clus_flter:
+            in_pred_kp = cls_voted_kps[:, ctr_labels, :]
+        else:
+            in_pred_kp = cls_voted_kps
+
+        for ikp, kps3d in enumerate(in_pred_kp):
+            cls_kps[cls_id_single, ikp, :], _ = ms.fit(kps3d)
+        
+        # visualize predicted keypoints
+        # if True:
+        #     import pdb; pdb.set_trace()
+        #     show_kp_img = np.zeros((480, 640, 3), np.uint8)
+        #     kp_2ds = bs_utils_lm.project_p3d(
+        #         cls_kps[cls_id].cpu().numpy(), 1000.0, K='linemod'
+        #     )
+        #     color = (0, 0, 255)  # bs_utils.get_label_color(cls_id.item())
+        #     show_kp_img = bs_utils_lm.draw_p2ds(show_kp_img, kp_2ds, r=3, color=color)
+        #     # imshow("kp: cls_id=%d" % cls_id, show_kp_img)
+        #     cv2.imwrite('/workspace/REPO/pose_estimation/ffb6d/train_log/lm_1_pseudo/phone/eval_results/test.png', show_kp_img)
+        #     waitKey(0)
+        
+        mesh_kps = bs_utils_lab.get_kps(cls_id, ds_type="lab")
+        if use_ctr:
+            mesh_ctr = bs_utils_lab.get_ctr(cls_id, ds_type="lab").reshape(1, 3)
+            mesh_kps = np.concatenate((mesh_kps, mesh_ctr), axis=0)
+        # mesh_kps = torch.from_numpy(mesh_kps.astype(np.float32)).cuda()
+        pred_RT = best_fit_transform(
+            mesh_kps,
+            cls_kps[cls_id_single].squeeze().contiguous().cpu().numpy()
+        )
+        
+        # visualize projected object
+        if False:
+            
+            mesh_pts = bs_utils_lab.get_pointxyz_cuda(cls_id, ds_type="lab").clone()
+            mesh_pts = mesh_pts[::2]
+            show_kp_img = np.zeros((480, 640, 3), np.uint8)
+            output_path = '/workspace/DATA/LabROS/all_vis_'+str(cls_id)+'.png'
+            input_path = '/workspace/DATA/LabROS/data/all.jpg'
+            
+            kp_2ds = bs_utils_lab.lab_draw_points(
+                output_path, input_path, cls_id, torch.from_numpy(pred_RT).double(), mesh_pts.cpu().double()
+            )
+            
+            waitKey(0)
+        
+    return pred_RT
+
 def eval_metric_lm_vis(img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id, pred_kp, gt_kp, gt_ctr):
     
     n_cls = config_lm.n_classes
@@ -555,6 +641,24 @@ def eval_one_frame_pose_lm(
          img_id, cls_ids, pred_pose_lst, RTs, mask, label, obj_id
     )
     return (cls_add_dis, cls_adds_dis, pred_kp, gt_kp, gt_ctr)
+
+def eval_one_frame_pose_lab(
+    item
+):
+      
+    
+    pcld, mask, pred_ctr_of, pred_kp_of, cls_id, use_ctr, \
+    n_cls, min_cnt_lst, use_ctr_clus_flter, \
+    epoch_lst, bs_lst, obj_id = item
+        
+        
+    pred_pose = cal_frame_poses_lab(
+        cls_id, pcld, mask, pred_ctr_of, pred_kp_of, use_ctr, n_cls, use_ctr_clus_flter,
+        obj_id
+    )
+
+    
+    return pred_pose
 def eval_one_frame_pose_lm_icp(
     item
 ):
@@ -936,7 +1040,41 @@ class TorchEval():
                 # )
         
         return (pred_RTs, gt_RTs, pred_kp, gt_kp, gt_ctr)
-    
+    def eval_pose_parallel_lab(
+        self, pclds, masks, pred_ctr_ofs, cnt,
+        cls_ids, pred_kp_ofs, min_cnt=20, merge_clus=False,
+        use_ctr_clus_flter=True, use_ctr=True, obj_id=0, kp_type='farthest',
+        ds='lab'
+    ):
+        
+        bs, n_kps, n_pts, c = pred_kp_ofs.size()
+        masks = masks.long()
+        cls_ids = [cls_ids]
+        use_ctr_lst = [use_ctr for i in range(bs)]
+        n_cls_lst = [self.n_cls for i in range(bs)]
+        min_cnt_lst = [min_cnt for i in range(bs)]
+        epoch_lst = [cnt*bs for i in range(bs)]
+        bs_lst = [i for i in range(bs)]
+        use_ctr_clus_flter_lst = [use_ctr_clus_flter for i in range(bs)]
+        obj_id_lst = [obj_id for i in range(bs)]
+        kp_type = [kp_type for i in range(bs)]
+        
+        data_gen = zip(
+            pclds, masks, pred_ctr_ofs, pred_kp_ofs,
+            cls_ids, use_ctr_lst, n_cls_lst, min_cnt_lst, use_ctr_clus_flter_lst,
+            epoch_lst, bs_lst, obj_id_lst
+        )
+        
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=bs
+        ) as executor:
+            eval_func = eval_one_frame_pose_lab
+            
+            for res in executor.map(eval_func, data_gen):
+                pred_pose = res
+                
+        return pred_pose
+
     def eval_pose_parallel(
         self, pclds, img_id, rgbs, masks, pred_ctr_ofs, gt_ctr_ofs, labels, cnt,
         cls_ids, RTs, pred_kp_ofs, gt_kps, gt_ctrs, min_cnt=20, merge_clus=False,

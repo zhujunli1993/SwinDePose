@@ -344,21 +344,7 @@ def pseudo_gen(args, dpt_xyz):
         new_img_angles = np.dstack((angle_x, angle_y))
         new_img_angles = np.dstack((new_img_angles, angle_z))
     
-    # if args.vis_img:
-    #     signed_x[signed_x==360] = 255
-    #     signed_x = (signed_x-signed_x[signed_x<255].min())*(254/(signed_x[signed_x<255].max()-signed_x[signed_x<255].min()))
-    #     signed_y[signed_y==360] = 255
-    #     signed_y = (signed_y-signed_y[signed_y<255].min())*(254/(signed_y[signed_y<255].max()-signed_y[signed_y<255].min()))
-    #     signed_z[signed_z==360] = 255
-    #     signed_z = (signed_z-signed_z[signed_z<255].min())*(254/(signed_z[signed_z<255].max()-signed_z[signed_z<255].min()))
-    #     # combine three channels and save to a png image
-    #     new_img_signed = np.dstack((signed_x, signed_y))
-    #     new_img_signed = np.dstack((new_img_signed, signed_z))
-    #     new_img_signed = new_img_signed.astype(np.uint8)
 
-    # else:
-    #     new_img_signed = np.dstack((signed_x, signed_y))
-    #     new_img_signed = np.dstack((new_img_signed, signed_z))
     
     return new_img_angles
 
@@ -383,7 +369,7 @@ for item_name in tqdm.tqdm(trainlist):
 
     cam_scale = 1000.0
     dpt_mm = fill_missing(dpt_mm, cam_scale, 1)
-    import pdb;pdb.set_trace()
+    
     if args.vis_img:
         # img_file = os.path.join('depth_0000.png')
         # dpt_mm_img = depth2show(dpt_mm)
@@ -400,16 +386,7 @@ for item_name in tqdm.tqdm(trainlist):
     dpt_mm = dpt_mm.copy().astype(np.uint16)
     nrm_map = normalSpeed.depth_normal(dpt_mm, K[0][0], K[1][1], 5, 2000, 20, False)
 
-    # if True:
-    #     show_nrm_map = ((nrm_map + 1.0) * 127).astype(np.uint8)
-    #     img_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'vis_nrm_{}.png'.format(item_name))
-    #     cv2.imwrite(img_file, show_nrm_map)
     
-    # dpt_m = dpt_mm.astype(np.float32) / cam_scale
-    # dpt_xyz = dpt_2_pcld(dpt_m, 1.0, K)
-    # dpt_xyz[np.isnan(dpt_xyz)] = 0.0
-    # dpt_xyz[np.isinf(dpt_xyz)] = 0.0
-
     start_time = time.time()
     # rgb = pseudo_gen(args, dpt_xyz)
     rgb_nrm = pseudo_nrm_angle(nrm_map)
@@ -439,10 +416,10 @@ for item_name in tqdm.tqdm(trainlist):
         exit()
         
         
-    # if not os.path.exists(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles')):
-    #     os.makedirs(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles'))
-    # rgb_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles','{}'.format(item_name))
-    # np.savez_compressed(rgb_file, angles=rgb_nrm)
+    if not os.path.exists(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles')):
+        os.makedirs(os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles'))
+    rgb_file = os.path.join('/workspace/DATA/Linemod_preprocessed/data',args.cls_num,'pseudo_nrm_angles','{}'.format(item_name))
+    np.savez_compressed(rgb_file, angles=rgb_nrm)
 print('Finish real/ training data generation!!')
 
 
