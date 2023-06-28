@@ -198,7 +198,7 @@ def model_fn_decorator(
             start_time = time.time()
             end_points = model(cu_dt)
             print("--- %s seconds ---" % (time.time() - start_time))
-            import pdb;pdb.set_trace()
+            
             
             labels = cu_dt['labels']
             loss_rgbd_seg = criterion(

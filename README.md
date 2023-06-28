@@ -46,7 +46,7 @@ sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 
 ```
 - Install mmseg within docker
 ```bash 
-pip install -r mmseg_install.txt
+pip install -r swin_de_pose/mmseg_install.txt
 ```
 - Install some neccessary package
 ```bash 
