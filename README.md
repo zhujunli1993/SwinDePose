@@ -1,4 +1,4 @@
-# SwinDePose
+# Official Source Code for the IROS2023 Oral Work, SwinDePose: Depth-based Object 6DoF Pose Estimation using Swin Transformers
 
 ## Table of Contents  
 
