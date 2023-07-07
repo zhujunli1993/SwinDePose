@@ -1,4 +1,4 @@
-# SwinDePose: Depth-based Object 6DoF Pose Estimation using Swin Transformers
+# [IROS 2023]SwinDePose: Depth-based Object 6DoF Pose Estimation using Swin Transformers
 
 This is the official source code for the IROS2023 oral work: Depth-based Object 6DoF Pose Estimation using Swin Transformers. (https://arxiv.org/abs/2303.02133).
 
