@@ -20,8 +20,7 @@ This is the official source code for the IROS2023 oral work: Depth-based Object 
   - [Results](#results)
   - [License](#license)
 
-
-### Update: Uploaded the pretrained models. 
+### Update!!!: Uploaded the pretrained models.
 
 ## Introduction & Citation
 <div align=center><img width="100%" src="figs/overview_one.PNG"/></div>
