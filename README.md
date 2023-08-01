@@ -20,7 +20,7 @@ This is the official source code for the IROS2023 oral work: Depth-based Object 
   - [Results](#results)
   - [License](#license)
 
-### Update!!!: Uploaded the pretrained models.
+### Update!!!: Uploaded the pretrained models of LM and OCC-LM datasets.
 
 ## Introduction & Citation
 <div align=center><img width="100%" src="figs/overview_one.PNG"/></div>
@@ -174,7 +174,7 @@ sh compile_op.sh
       ``` bash sh scripts/test_occlm.sh ```
 
   You can evaluate different checkpoint by revising ``tst_mdl`` to the path of your target model.
-- **Pretrained model**: We provide our pre-trained models for each object on onedrive, [link](). Download them and move them to their according folders. 
+- **Pretrained model**: We provide our pre-trained models for each object on onedrive, [link](https://cuny547-my.sharepoint.com/:u:/g/personal/zli3_gradcenter_cuny_edu/EWfHIHFg6MtKntTzBkOdzM4BPP41nlXWfVI-IAdj_K1-4g?e=gajiZ1). Download them and move them to their according folders. 
 
 ### Visualizaion on the Occ-LineMOD Dataset
 
