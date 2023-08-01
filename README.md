@@ -21,7 +21,7 @@ This is the official source code for the IROS2023 oral work: Depth-based Object 
   - [License](#license)
 
 
-To preview the MD file, press ctrl+k+v
+### Update: Uploaded the pretrained models. 
 
 ## Introduction & Citation
 <div align=center><img width="100%" src="figs/overview_one.PNG"/></div>
@@ -44,7 +44,7 @@ docker pull zhujunli/swin-pose:latest
 ```
 - Run our swin-pose docker
 ```bash 
-sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 --name swin-ffb -it --rm -v your_workspace_directory:/workspace zhujunli/swin-pose:latest
+sudo nvidia-docker run --gpus all --ipc=host --shm-size 50G --ulimit memlock=-1 --name your_docker_environment_name -it --rm -v your_workspace_directory:/workspace zhujunli/swin-pose:latest
 ```
 - Install mmseg within docker
 ```bash 
@@ -153,7 +153,7 @@ sh compile_op.sh
 - Start evaluation by:
       ``` bash sh scripts/test_lm.sh ```
   You can evaluate different checkpoint by revising ``tst_mdl`` to the path of your target model.
-- **Pretrained model**: We provide our pre-trained models for each object on onedrive, [link](). Download them and move them to their according folders. For example, move the ``ape_best.pth.tar`` to ``train_log/linemod/checkpoints/ape/``. Then revise ``tst_mdl=train_log/linemod/checkpoints/ape/ape_best.path.tar`` for testing.
+- **Pretrained model**: We provide our pre-trained models for each object on onedrive, [link](https://cuny547-my.sharepoint.com/:u:/g/personal/zli3_gradcenter_cuny_edu/EUWe0Qe2i6BJvEiOn_iVQjUBeRHzW-JZ_1zt4bVIzAJFnA?e=BwthPd). Download them and move them to their according folders. For example, move the ``ape_best.pth.tar`` to ``train_log/linemod/checkpoints/ape/``. Then revise ``tst_mdl=train_log/linemod/checkpoints/ape/ape_best.path.tar`` for testing.
 
 ### Visualizaion on the LineMOD Dataset
 
