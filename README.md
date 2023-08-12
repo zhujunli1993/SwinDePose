@@ -57,6 +57,11 @@ git clone https://github.com/hfutcgncas/normalSpeed.git
 cd normalSpeed
 python3 setup.py install --user
 ```
+- Install some neccessary package
+```bash 
+cd models/RandLA
+sh compile_op.sh
+```
 Due to lacking of apex installation, you may have to delete all apex related modules and functions.
 - To infer pose for ROS manipulation system,
 ```bash
@@ -207,6 +212,22 @@ sh compile_op.sh
 - After training your models or downloading the pre-trained models, you can visualizing the results:
       ``` bash sh scripts/test_occlm_vis.sh ```
 
+### Training on the YCBV Dataset
+
+- Train the model for the target object. 
+  
+  ``` bash sh scripts/train_ycb.sh ```
+    
+    The trained checkpoints are stored in 
+    ``experiment_name/train_log/ycb/checkpoints/ycb.pth.tar``.
+
+### Evaluating on the YCBV Dataset
+
+- Start evaluation by:
+      ``` bash sh scripts/test_ycb.sh ```
+
+  You can evaluate different checkpoint by revising ``tst_mdl`` to the path of your target model.
+- **Pretrained model**: We provide our pre-trained models on onedrive, [link](https://cuny547-my.sharepoint.com/:u:/g/personal/zli3_gradcenter_cuny_edu/Eb29fBpSZz1IrydJphLG_q0ByKantwDF_NTc095w79J1Cw?e=aWKL3P). Download them and move them to their according folders. 
 ## Results
 <details>
   <summary>[Click to expand]</summary>
@@ -223,6 +244,9 @@ sh compile_op.sh
 
 - **Qualitative Results on the Occlusion LineMod Dataset**
 <div align=center><img width="100%" src="figs/OccLM_Qual_new.PNG"/></div>
+
+- **Evaluation on the YCBV Dataset**
+<div align=center><img width="100%" src="figs/ycb.PNG"/></div>
 
 </details>
 

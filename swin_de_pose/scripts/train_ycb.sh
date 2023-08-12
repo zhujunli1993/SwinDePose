@@ -1,14 +1,14 @@
 #!/bin/bash
 GPU_NUM=0
 GPU_COUNT=1
-NAME='ycbv_swinTiny_fullSyn_dense_fullInc'
+NAME='experiment_name'
 WANDB_PROJ='pose_estimation'
 export CUDA_VISIBLE_DEVICES=$GPU_NUM
-EXP_DIR='/workspace/REPO/pose_estimation/ffb6d/train_log'
+EXP_DIR='swin_de_pose/experiment_name/train_log'
 LOG_EVAL_DIR="$EXP_DIR/$NAME/ycb/eval_results"
 SAVE_CHECKPOINT="$EXP_DIR/$NAME/ycb/checkpoints"
 LOG_TRAININFO_DIR="$EXP_DIR/$NAME/ycb/train_info"
-tst_mdl="$SAVE_CHECKPOINT/FFB6D_ycb.pth.tar"
+tst_mdl="$SAVE_CHECKPOINT/ycb.pth.tar"
 python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 60086 apps/train_ycb.py \
     --gpus=$GPU_COUNT \
     --wandb_proj $WANDB_PROJ \
@@ -17,7 +17,7 @@ python -m torch.distributed.launch --nproc_per_node=$GPU_COUNT --master_port 600
     --gpu_id $GPU_NUM \
     --gpus $GPU_COUNT \
     --lr 1e-2 --cyc_max_lr 1e-3 --cyc_base_lr 1e-5 --clr_div 9 \
-    --data_root '/workspace/DATA/YCB_Video_Dataset' \
+    --data_root 'your_dataset_dir/YCB_Video_Dataset' \
     --train_list 'train_data.txt' --test_list 'test_data.txt' \
     --gpu_id $GPU_NUM \
     --gpus $GPU_COUNT \
