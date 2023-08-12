@@ -42,7 +42,7 @@ If you find SwinDePose useful in your research, please consider citing:
 ```bash 
 conda env create -f swin_de_pose/environment.yml
 ```
-- Activate our swin-pose conda environment``` 
+- Activate our swin-pose conda environment
 ```bash
 conda activate lab-swin
 ```
