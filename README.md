@@ -38,7 +38,7 @@ If you find SwinDePose useful in your research, please consider citing:
 }
 ```
 ## Installation - From conda
- - Install conda environment from conda environment.yml (it might take a while)
+ - Install conda environment from conda environment.yml (it might take a while, and don't forget changing the prefix in the end of environment.yml file)
 ```bash 
 conda env create -f swin_de_pose/environment.yml
 ```
