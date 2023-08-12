@@ -21,6 +21,7 @@ This is the official source code for the IROS2023 oral work: Depth-based Object 
   - [License](#license)
 
 ### Update!!!: Uploaded the pretrained models of LM and OCC-LM datasets.
+### Update!!!: Uploaded conda installation environments file.
 
 ## Introduction & Citation
 <div align=center><img width="100%" src="figs/overview_one.PNG"/></div>
@@ -35,6 +36,31 @@ If you find SwinDePose useful in your research, please consider citing:
   author={Zhujun Li and Ioannis Stamos},
   year={2023}
 }
+```
+## Installation - From conda
+ - Install conda environment from conda environment.yml (it might take a while)
+```bash 
+conda env create -f swin_de_pose/environment.yml
+```
+- Activate our swin-pose conda environment``` 
+```bash
+conda activate lab-swin
+```
+- Install mmseg within conda
+```bash 
+pip install -r swin_de_pose/mmseg_install.txt
+```
+- Following [normalSpeed](https://github.com/hfutcgncas/normalSpeed) to install normalSpeed within conda
+```bash
+pip3 install "pybind11[global]"
+git clone https://github.com/hfutcgncas/normalSpeed.git
+cd normalSpeed
+python3 setup.py install --user
+```
+Due to lacking of apex installation, you may have to delete all apex related modules and functions.
+- To infer pose for ROS manipulation system,
+```bash
+sh scripts/test_single_lab.sh
 ```
 ## Installation - From docker 
 - Pull docker image from docker hub

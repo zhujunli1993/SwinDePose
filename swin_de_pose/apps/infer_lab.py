@@ -33,9 +33,9 @@ from utils.basic_utils import Basic_Utils
 import datasets.lab.lab_dataset as dataset_desc
 
 
-from apex.parallel import DistributedDataParallel
-from apex.parallel import convert_syncbn_model
-from apex import amp
+
+# from apex.parallel import convert_syncbn_model
+# from apex import amp
 
 
     
@@ -124,7 +124,7 @@ def load_checkpoint(model=None, optimizer=None, filename="checkpoint"):
             model.load_state_dict(ck_st)
         if optimizer is not None and checkpoint["optimizer_state"] is not None:
             optimizer.load_state_dict(checkpoint["optimizer_state"])
-        amp.load_state_dict(checkpoint["amp"])
+        # amp.load_state_dict(checkpoint["amp"])
         print("==> Done")
         return it, epoch, best_prec
     else:
@@ -180,10 +180,10 @@ def model_fn_decorator(
                 elif data[key].dtype in [torch.int32, torch.int16]:
                     cu_dt[key] = data[key].long().cuda()
             
-            # start_time = time.time()
+            start_time = time.time()
             
             end_points = model(cu_dt)
-            # print("--- %s seconds ---" % (time.time() - start_time))
+            print("--- %s seconds ---" % (time.time() - start_time))
             
             
             _, cls_rgbd = torch.max(end_points['pred_rgbd_segs'], 1)
@@ -392,7 +392,7 @@ def train():
     )
 
     print("Number of model parameters: ", count_parameters(model))
-    model = convert_syncbn_model(model)
+    # model = convert_syncbn_model(model)
     device = torch.device('cuda:{}'.format(opt.local_rank))
     print('local_rank:', opt.local_rank)
     model.to(device)
@@ -401,9 +401,9 @@ def train():
         model.parameters(), lr=opt.lr, weight_decay=opt.weight_decay
     )
     opt_level = opt.opt_level
-    model, optimizer = amp.initialize(
-        model, optimizer, opt_level=opt_level,
-    )
+    # model, optimizer = amp.initialize(
+    #     model, optimizer, opt_level=opt_level,
+    # )
 
     # default value
     it = -1  # for the initialize value of `LambdaLR` and `BNMomentumScheduler`
@@ -460,9 +460,9 @@ def train():
         pred_pose = trainer.eval_epoch(
             test_loader, opt.n_total_epoch, is_test=True, test_pose=opt.test_pose
         )
-        print("-------------------Estimation Result for "+opt.linemod_cls+" ---------------------------\n")
+        print("-------------------Estimation Result---------------------------\n")
         print(pred_pose)
-        np.savetxt(opt.lab_pose_save,pred_pose)
+        np.savetxt(os.path.join(opt.lab_pose_save, opt.linemod_cls+'_pred.txt'),pred_pose)
         
         # save test results
         

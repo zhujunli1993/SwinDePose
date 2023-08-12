@@ -15,7 +15,7 @@ try:
     from neupeak.utils.webcv2 import imshow, waitKey
 except Exception:
     from cv2 import imshow, waitKey
-import pdb
+
 opt = BaseOptions().parse()
 if opt.dataset_name=='linemod':
     config_lm = Config(ds_name="linemod", cls_type=opt.linemod_cls)
@@ -74,6 +74,7 @@ def cal_frame_poses(
     pcld, mask, ctr_of, pred_kp_of, use_ctr, n_cls, use_ctr_clus_flter,
     gt_kps, gt_ctrs, debug=False, kp_type='farthest'
 ):
+    
     """
     Calculates pose parameters by 3D keypoints & center points voting to build
     the 3D-3D corresponding then use least-squares fitting to get the pose parameters.
@@ -208,7 +209,7 @@ def eval_one_frame_pose(
 ):
     pcld, mask, ctr_of, pred_kp_of, RTs, cls_ids, use_ctr, n_cls, \
         min_cnt, use_ctr_clus_flter, label, epoch, ibs, gt_kps, gt_ctrs, kp_type = item
-
+    
     pred_cls_ids, pred_pose_lst, pred_kpc_lst = cal_frame_poses(
         pcld, mask, ctr_of, pred_kp_of, use_ctr, n_cls, use_ctr_clus_flter,
         gt_kps, gt_ctrs, kp_type=kp_type
@@ -532,7 +533,6 @@ def cal_frame_poses_lab(
             _ = bs_utils_lab.lab_draw_points(
                 opt.lab_vis_output, opt.lab_vis_input, cls_id, torch.from_numpy(pred_RT).double(), mesh_pts.cpu().double()
             )
-            
             
         
     return pred_RT
@@ -1140,8 +1140,10 @@ class TorchEval():
                 self.cls_adds_dis = self.merge_lst(
                     self.cls_adds_dis, cls_adds_dis_lst
                 )
-        
-        return (cls_add_dis_lst[0][0], cls_adds_dis_lst[0][0], pred_kp, gt_kp, gt_ctr)
+        if ds=='ycb':
+            return (cls_add_dis_lst[0][0], cls_adds_dis_lst[0][0])
+        else:
+            return (cls_add_dis_lst[0][0], cls_adds_dis_lst[0][0], pred_kp, gt_kp, gt_ctr)
 
     def merge_lst(self, targ, src):
         

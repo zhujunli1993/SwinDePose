@@ -327,10 +327,12 @@ class Dataset():
                 p2ds = bs_utils.project_p3d(inputs['cld_xyz%d'%ip], cam_scale, K)
                 srgb1 = bs_utils.paste_p2ds(show_rgb.copy(), p2ds, (0, 0, 255))
                 imshow("rz_pcld_%d_rnd" % ip, srgb1)
+        
 
         item_dict = dict(
-            rgb=rgb.astype(np.uint8),  # [c, h, w]
-            cld_rgb_nrm=cld_rgb_nrm.astype(np.float32),  # [9, npts]
+            img_id=np.uint8(item_name.split('/')[-1]),
+            nrm_angles=rgb.astype(np.uint8),  # [c, h, w]
+            cld_angle_nrm=cld_rgb_nrm.astype(np.float32),  # [9, npts]
             choose=choose.astype(np.int32),  # [1, npts]
             labels=labels_pt.astype(np.int32),  # [npts]
             rgb_labels=rgb_labels.astype(np.int32),  # [h, w]
