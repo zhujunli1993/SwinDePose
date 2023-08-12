@@ -20,7 +20,7 @@ This is the official source code for the IROS2023 oral work: Depth-based Object 
   - [Results](#results)
   - [License](#license)
 
-### Update!!!: Uploaded the pretrained models of LM and OCC-LM datasets.
+### Update!!!: Uploaded the pretrained models of LM and OCC-LM and YCBV datasets.
 ### Update!!!: Uploaded conda installation environments file.
 
 ## Introduction & Citation
