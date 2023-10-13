@@ -20,6 +20,7 @@ This is the official source code for the IROS2023 oral work: Depth-based Object 
   - [Results](#results)
   - [License](#license)
 
+### Update!!! Uploaded the information of the robot that we integrated with our model for testing in a real-world environment for object grasping. 
 ### Update!!!: Uploaded the pretrained models of LM and OCC-LM and YCBV datasets.
 ### Update!!!: Uploaded conda installation environments file.
 
@@ -249,6 +250,9 @@ sh compile_op.sh
 <div align=center><img width="100%" src="figs/ycb.PNG"/></div>
 
 </details>
+
+## Fetch Robot Information
+Following [Fetch Robot](https://docs.fetchrobotics.com/manipulation.html) to check the robot we integrated. 
 
 ## License
 SwinDePose is released under the MIT License (refer to the LICENSE file for details).
