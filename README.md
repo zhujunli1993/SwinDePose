@@ -254,8 +254,8 @@ sh compile_op.sh
 ## Fetch Robot Information
 Following [Fetch Robot](https://docs.fetchrobotics.com/manipulation.html) to check the robot we integrated. 
 
-## Fetch Robot Grasping Videl
-Following [Grasping Video](https://youtu.be/j57njO4JmtA) to check the video that the robot embedded SwinDePose network grasps texture-less object. 
+## Fetch Robot Grasping Video
+Following [Robot Grasping Video](https://youtu.be/j57njO4JmtA) to check the video that our fetch robot embedded our SwinDePose network grasps texture-less objects. 
 
 ## License
 SwinDePose is released under the MIT License (refer to the LICENSE file for details).
